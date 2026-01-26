@@ -1,12 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import TripsView from './components/TripsView';
 import ExpensesView from './components/ExpensesView';
 import MaintenanceView from './components/MaintenanceView';
 import AdminView from './components/AdminView';
-import { AppState, Trip, FuelLog, TyreStatus, Tyre, Collaborator, Driver, Vehicle, Material } from './types';
+import { AppState, Trip, FuelLog, TyreStatus, Tyre, Collaborator, Driver, Vehicle, Material, Expense, MaintenanceLog } from './types';
+import { supabase } from './services/supabaseClient';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 const INITIAL_TYRES: Tyre[] = Array.from({ length: 10 }, (_, i) => ({
   id: i + 1,
@@ -21,160 +23,244 @@ const INITIAL_MATERIALS: Material[] = [
   { id: '5', name: 'Top Soil' },
 ];
 
+const DEFAULT_STATE: AppState = {
+  activeTab: 'dashboard',
+  trips: [],
+  collaborators: [],
+  drivers: [
+    { id: 'd1', name: 'Suresh Kumar', type: 'Permanent' }
+  ],
+  vehicles: [
+    { id: 'v1', reg_number: 'MH04-HY-9921', current_odometer: 125400 }
+  ],
+  materials: INITIAL_MATERIALS,
+  fuelLogs: [],
+  expenses: [],
+  maintenance: [],
+  tyres: INITIAL_TYRES,
+  activeVehicleId: 'v1',
+  fontSize: 16,
+};
+
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem('tipper_state_v4');
-    if (saved) return JSON.parse(saved);
-    return {
-      activeTab: 'dashboard',
-      trips: [],
-      collaborators: [],
-      drivers: [
-        { id: 'd1', name: 'Suresh Kumar', type: 'Permanent' }
-      ],
-      vehicles: [
-        { id: 'v1', reg_number: 'MH04-HY-9921', current_odometer: 125400 }
-      ],
-      materials: INITIAL_MATERIALS,
-      fuelLogs: [],
-      expenses: [],
-      maintenance: [],
-      tyres: INITIAL_TYRES,
-      activeVehicleId: 'v1',
-    };
-  });
+  const [state, setState] = useState<AppState>(DEFAULT_STATE);
+  const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      const [
+        { data: trips },
+        { data: collaborators },
+        { data: drivers },
+        { data: vehicles },
+        { data: materials },
+        { data: fuelLogs },
+        { data: expenses },
+        { data: tyres },
+        { data: settings },
+        { data: maintenance }
+      ] = await Promise.all([
+        supabase.from('trips').select('*').order('created_at', { ascending: false }),
+        supabase.from('collaborators').select('*').order('name', { ascending: true }),
+        supabase.from('drivers').select('*'),
+        supabase.from('vehicles').select('*'),
+        supabase.from('materials').select('*'),
+        supabase.from('fuel_logs').select('*').order('created_at', { ascending: false }),
+        supabase.from('expenses').select('*').order('created_at', { ascending: false }),
+        supabase.from('tyres').select('*').order('id', { ascending: true }),
+        supabase.from('app_settings').select('*').single(),
+        supabase.from('maintenance_logs').select('*').order('created_at', { ascending: false })
+      ]);
+
+      setState(prev => ({
+        ...prev,
+        trips: trips || [],
+        collaborators: collaborators || [],
+        drivers: drivers && drivers.length > 0 ? drivers : prev.drivers,
+        vehicles: vehicles && vehicles.length > 0 ? vehicles : prev.vehicles,
+        materials: materials && materials.length > 0 ? materials : prev.materials,
+        fuelLogs: fuelLogs || [],
+        expenses: expenses || [],
+        maintenance: maintenance || [],
+        tyres: tyres && tyres.length > 0 ? tyres : INITIAL_TYRES,
+        activeVehicleId: settings?.active_vehicle_id || prev.activeVehicleId,
+        fontSize: settings?.font_size || prev.fontSize,
+      }));
+    } catch (error) {
+      console.error('Fetch error:', error);
+    } finally {
+      setLoading(false);
+      setIsSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('tipper_state_v4', JSON.stringify(state));
-  }, [state]);
+    fetchData();
 
-  const handleAddTrip = (trip: Omit<Trip, 'id' | 'created_at'> & { created_at?: string }) => {
-    const newTrip: Trip = {
-      ...trip,
-      id: Math.random().toString(36).substr(2, 9),
-      created_at: trip.created_at || new Date().toISOString(),
-    };
-    setState(prev => ({ ...prev, trips: [newTrip, ...prev.trips] }));
+    if (supabase) {
+      const channel = supabase
+        .channel('schema-db-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_logs' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborators' }, () => fetchData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_logs' }, () => fetchData())
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [fetchData]);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${state.fontSize}px`;
+  }, [state.fontSize]);
+
+  // Handlers for Collaborators
+  const handleAddCollaborator = async (name: string) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('collaborators').insert([{ name }]).select();
+    if (!error && data) {
+      setState(prev => ({ ...prev, collaborators: [...prev.collaborators, data[0]] }));
+    }
   };
 
-  const handleDeleteTrip = (id: string) => setState(prev => ({ ...prev, trips: prev.trips.filter(t => t.id !== id) }));
-  const handleUpdateTrip = (updatedTrip: Trip) => setState(prev => ({ ...prev, trips: prev.trips.map(t => t.id === updatedTrip.id ? updatedTrip : t) }));
-
-  const handleAddCollaborator = (name: string) => {
-    const newCollab: Collaborator = { id: Math.random().toString(36).substr(2, 9), name };
-    setState(prev => ({ ...prev, collaborators: [...prev.collaborators, newCollab] }));
-  };
-  const handleUpdateCollaborator = (id: string, name: string) => {
+  const handleUpdateCollaborator = async (id: string, name: string) => {
+    if (!supabase) return;
+    await supabase.from('collaborators').update({ name }).eq('id', id);
     setState(prev => ({ ...prev, collaborators: prev.collaborators.map(c => c.id === id ? { ...c, name } : c) }));
   };
-  const handleDeleteCollaborator = (id: string) => {
+
+  const handleDeleteCollaborator = async (id: string) => {
+    if (!supabase) return;
+    await supabase.from('collaborators').delete().eq('id', id);
     setState(prev => ({ ...prev, collaborators: prev.collaborators.filter(c => c.id !== id) }));
   };
 
-  const handleAddDriver = (driver: Omit<Driver, 'id'>) => {
-    const newDriver: Driver = { ...driver, id: Math.random().toString(36).substr(2, 9) };
-    setState(prev => ({ ...prev, drivers: [...prev.drivers, newDriver] }));
+  // Handlers for Materials
+  const handleAddMaterial = async (name: string) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('materials').insert([{ name }]).select();
+    if (!error && data) {
+      setState(prev => ({ ...prev, materials: [...prev.materials, data[0]] }));
+    }
   };
 
-  const handleAddVehicle = (vehicle: Omit<Vehicle, 'id'>) => {
-    const newVehicle: Vehicle = { ...vehicle, id: Math.random().toString(36).substr(2, 9) };
-    setState(prev => ({ ...prev, vehicles: [...prev.vehicles, newVehicle] }));
-  };
-  const handleUpdateVehicle = (id: string, updates: Partial<Vehicle>) => {
-    setState(prev => ({ ...prev, vehicles: prev.vehicles.map(v => v.id === id ? { ...v, ...updates } : v) }));
-  };
-  const handleDeleteVehicle = (id: string) => {
-    setState(prev => ({ ...prev, vehicles: prev.vehicles.filter(v => v.id !== id) }));
-  };
-
-  const handleAddMaterial = (name: string) => {
-    const newMat: Material = { id: Math.random().toString(36).substr(2, 9), name };
-    setState(prev => ({ ...prev, materials: [...prev.materials, newMat] }));
-  };
-  const handleDeleteMaterial = (id: string) => setState(prev => ({ ...prev, materials: prev.materials.filter(m => m.id !== id) }));
-  const handleUpdateMaterial = (id: string, name: string) => {
+  const handleUpdateMaterial = async (id: string, name: string) => {
+    if (!supabase) return;
+    await supabase.from('materials').update({ name }).eq('id', id);
     setState(prev => ({ ...prev, materials: prev.materials.map(m => m.id === id ? { ...m, name } : m) }));
   };
 
-  const handleAddFuel = (log: Omit<FuelLog, 'id' | 'created_at' | 'calculated_mileage'>) => {
+  const handleDeleteMaterial = async (id: string) => {
+    if (!supabase) return;
+    await supabase.from('materials').delete().eq('id', id);
+    setState(prev => ({ ...prev, materials: prev.materials.filter(m => m.id !== id) }));
+  };
+
+  // Other Handlers
+  const handleAddTrip = async (trip: Omit<Trip, 'id' | 'created_at'> & { created_at?: string }) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('trips').insert([trip]).select();
+    if (!error && data) setState(prev => ({ ...prev, trips: [data[0], ...prev.trips] }));
+  };
+
+  const handleAddFuel = async (log: Omit<FuelLog, 'id' | 'created_at' | 'calculated_mileage'>) => {
+    if (!supabase) return;
     const lastOdo = state.fuelLogs.find(f => f.vehicle_id === log.vehicle_id)?.odometer || 
                    state.vehicles.find(v => v.id === log.vehicle_id)?.current_odometer || 0;
     const distance = log.odometer - lastOdo;
     const mileage = distance > 0 ? distance / log.liters : 4.0; 
-    const newLog: FuelLog = { ...log, id: Math.random().toString(36).substr(2, 9), created_at: new Date().toISOString(), calculated_mileage: mileage };
-    setState(prev => ({ ...prev, fuelLogs: [newLog, ...prev.fuelLogs], vehicles: prev.vehicles.map(v => v.id === log.vehicle_id ? { ...v, current_odometer: log.odometer } : v) }));
-  };
+    const newLogEntry = { ...log, calculated_mileage: mileage };
 
-  const handleUpdateTyre = (id: number, status: TyreStatus) => setState(prev => ({ ...prev, tyres: prev.tyres.map(t => t.id === id ? { ...t, status } : t) }));
-
-  const renderContent = () => {
-    const activeVehicle = state.vehicles.find(v => v.id === state.activeVehicleId) || state.vehicles[0];
-
-    switch (state.activeTab) {
-      case 'dashboard':
-        return (
-          <Dashboard 
-            trips={state.trips} 
-            expenses={state.expenses} 
-            fuelLogs={state.fuelLogs}
-            drivers={state.drivers}
-            nextServiceKm={activeVehicle ? (activeVehicle.current_odometer % 5000 === 0 ? 5000 : 5000 - (activeVehicle.current_odometer % 5000)) : 5000}
-            onQuickAction={(type) => {
-              setState(prev => ({ ...prev, activeTab: 'trips' }));
-              // Logic to handle auto-open of specific form can be added here if needed
-            }}
-            onAdminClick={() => setState(prev => ({ ...prev, activeTab: 'admin' }))}
-          />
-        );
-      case 'trips':
-        return (
-          <TripsView 
-            trips={state.trips} 
-            collaborators={state.collaborators}
-            drivers={state.drivers}
-            vehicles={state.vehicles}
-            materials={state.materials}
-            onAddTrip={handleAddTrip} 
-            onAddCollaborator={handleAddCollaborator}
-            onUpdateCollaborator={handleUpdateCollaborator}
-            onDeleteCollaborator={handleDeleteCollaborator}
-            onAddMaterial={handleAddMaterial}
-            onDeleteMaterial={handleDeleteMaterial}
-            onUpdateMaterial={handleUpdateMaterial}
-          />
-        );
-      case 'expenses':
-        return <ExpensesView fuelLogs={state.fuelLogs} onAddFuel={handleAddFuel} vehicles={state.vehicles} />;
-      case 'maintenance':
-        return (
-          <MaintenanceView 
-            tyres={state.tyres} 
-            vehicles={state.vehicles}
-            maintenanceLogs={state.maintenance} 
-            onUpdateTyre={handleUpdateTyre}
-            onAddVehicle={handleAddVehicle}
-            onUpdateVehicle={handleUpdateVehicle}
-            onDeleteVehicle={handleDeleteVehicle}
-          />
-        );
-      case 'admin':
-        return (
-          <AdminView 
-            state={state}
-            onAddDriver={handleAddDriver}
-            onAddVehicle={handleAddVehicle}
-            onDeleteTrip={handleDeleteTrip}
-            onUpdateTrip={handleUpdateTrip}
-          />
-        );
-      default:
-        return <Dashboard trips={[]} expenses={[]} fuelLogs={[]} drivers={[]} nextServiceKm={5000} onQuickAction={()=>{}} onAdminClick={()=>{}} />;
+    const { data, error } = await supabase.from('fuel_logs').insert([newLogEntry]).select();
+    if (!error && data) {
+      await handleUpdateVehicle(log.vehicle_id, { current_odometer: log.odometer });
+      setState(prev => ({ 
+        ...prev, 
+        fuelLogs: [data[0], ...prev.fuelLogs],
+        vehicles: prev.vehicles.map(v => v.id === log.vehicle_id ? { ...v, current_odometer: log.odometer } : v)
+      }));
     }
   };
 
+  const handleUpdateVehicle = async (id: string, updates: Partial<Vehicle>) => {
+    if (!supabase) return;
+    await supabase.from('vehicles').update(updates).eq('id', id);
+    setState(prev => ({ ...prev, vehicles: prev.vehicles.map(v => v.id === id ? { ...v, ...updates } : v) }));
+  };
+
+  const handleUpdateTyre = async (id: number, status: TyreStatus) => {
+    if (!supabase) return;
+    await supabase.from('tyres').upsert({ id, status });
+    setState(prev => ({ ...prev, tyres: prev.tyres.map(t => t.id === id ? { ...t, status } : t) }));
+  };
+
+  const handleUpdateFontSize = async (size: number) => {
+    if (!supabase) return;
+    await supabase.from('app_settings').upsert({ id: 1, font_size: size });
+    setState(prev => ({ ...prev, fontSize: size }));
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 text-safety-yellow animate-spin" />
+        <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">TipperPro Cloud Sync</p>
+      </div>
+    );
+  }
+
   return (
     <Layout activeTab={state.activeTab} setActiveTab={(tab) => setState(prev => ({ ...prev, activeTab: tab }))}>
-      <div className="max-w-md mx-auto">{renderContent()}</div>
+      <div className="max-w-md mx-auto relative">
+        {isSyncing && (
+          <div className="fixed top-20 right-4 z-50 flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full shadow-2xl animate-in fade-in slide-in-from-right-4">
+             <RefreshCw size={10} className="text-safety-yellow animate-spin" />
+             <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Syncing</span>
+          </div>
+        )}
+        {(() => {
+          const activeVehicle = state.vehicles.find(v => v.id === state.activeVehicleId) || state.vehicles[0];
+          switch (state.activeTab) {
+            case 'dashboard':
+              return <Dashboard trips={state.trips} expenses={state.expenses} fuelLogs={state.fuelLogs} drivers={state.drivers} nextServiceKm={activeVehicle ? (5000 - (activeVehicle.current_odometer % 5000)) : 5000} onQuickAction={() => setState(prev => ({ ...prev, activeTab: 'trips' }))} onAdminClick={() => setState(prev => ({ ...prev, activeTab: 'admin' }))} />;
+            case 'trips':
+              return (
+                <TripsView 
+                  trips={state.trips} 
+                  collaborators={state.collaborators} 
+                  drivers={state.drivers} 
+                  vehicles={state.vehicles} 
+                  materials={state.materials} 
+                  onAddTrip={handleAddTrip} 
+                  onAddCollaborator={handleAddCollaborator}
+                  onUpdateCollaborator={handleUpdateCollaborator}
+                  onDeleteCollaborator={handleDeleteCollaborator}
+                  onAddMaterial={handleAddMaterial}
+                  onDeleteMaterial={handleDeleteMaterial}
+                  onUpdateMaterial={handleUpdateMaterial}
+                />
+              );
+            case 'expenses':
+              return <ExpensesView fuelLogs={state.fuelLogs} onAddFuel={handleAddFuel} vehicles={state.vehicles} />;
+            case 'maintenance':
+              return <MaintenanceView tyres={state.tyres} vehicles={state.vehicles} maintenanceLogs={state.maintenance} onUpdateTyre={handleUpdateTyre} onAddVehicle={(v) => supabase?.from('vehicles').insert([v]).then(fetchData)} onUpdateVehicle={handleUpdateVehicle} onDeleteVehicle={(id) => supabase?.from('vehicles').delete().eq('id', id).then(fetchData)} />;
+            case 'admin':
+              return <AdminView state={state} onAddDriver={(d) => supabase?.from('drivers').insert([d]).then(fetchData)} onAddVehicle={(v) => supabase?.from('vehicles').insert([v]).then(fetchData)} onDeleteTrip={(id) => supabase?.from('trips').delete().eq('id', id).then(fetchData)} onUpdateTrip={(t) => supabase?.from('trips').update(t).eq('id', t.id).then(fetchData)} onUpdateFontSize={handleUpdateFontSize} />;
+            default:
+              return null;
+          }
+        })()}
+      </div>
     </Layout>
   );
 };

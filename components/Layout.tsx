@@ -8,6 +8,26 @@ interface LayoutProps {
   setActiveTab: (tab: any) => void;
 }
 
+const AppLogo = () => (
+  <div className="relative flex items-center justify-center w-10 h-10 bg-safety-yellow rounded-full shadow-[0_0_15px_rgba(255,215,0,0.3)]">
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="black" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className="w-6 h-6"
+    >
+      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+      <path d="M15 18H9" />
+      <path d="M19 18h2a1 1 0 0 0 1-1v-5l-4-4h-3v10" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
+    </svg>
+  </div>
+);
+
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -18,15 +38,17 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100 pb-24">
-      <header className="sticky top-0 z-50 bg-zinc-900 border-b border-zinc-800 p-4 shadow-lg flex justify-between items-center">
-        <div className="flex flex-col">
-          <h1 className="text-xl font-black uppercase tracking-tighter text-safety-yellow flex items-center gap-2 leading-none">
-            <div className="w-2 h-6 bg-safety-yellow"></div>
-            Tipperlog
-          </h1>
-          <span className="text-[9px] font-typewriter text-zinc-500 uppercase tracking-[0.2em] ml-4 mt-1">
-            powered by Sundar
-          </span>
+      <header className="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 p-4 shadow-lg flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <AppLogo />
+          <div className="flex flex-col items-end">
+            <h1 className="text-xl font-black uppercase tracking-tighter text-white leading-none">
+              Tipperlog
+            </h1>
+            <span className="text-[5px] font-typewriter text-zinc-500 uppercase tracking-[0.2em] mt-0.5">
+              powered by Sundar
+            </span>
+          </div>
         </div>
         <button 
           onClick={() => setActiveTab('admin')}

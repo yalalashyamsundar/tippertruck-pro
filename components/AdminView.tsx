@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AppState, Driver, Vehicle, Trip } from '../types';
-import { UserPlus, Truck, Trash2, Edit2, Check, X } from 'lucide-react';
+import { UserPlus, Truck, Trash2, Edit2, Check, X, Type, Sun, Moon } from 'lucide-react';
 
 interface AdminViewProps {
   state: AppState;
@@ -9,10 +9,11 @@ interface AdminViewProps {
   onAddVehicle: (vehicle: Omit<Vehicle, 'id'>) => void;
   onDeleteTrip: (id: string) => void;
   onUpdateTrip: (trip: Trip) => void;
+  onUpdateFontSize: (size: number) => void;
 }
 
-const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle, onDeleteTrip, onUpdateTrip }) => {
-  const [activePanel, setActivePanel] = useState<'drivers' | 'vehicles' | 'trips'>('drivers');
+const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle, onDeleteTrip, onUpdateTrip, onUpdateFontSize }) => {
+  const [activePanel, setActivePanel] = useState<'drivers' | 'vehicles' | 'trips' | 'settings'>('drivers');
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [tempTrip, setTempTrip] = useState<Trip | null>(null);
 
@@ -23,12 +24,12 @@ const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle,
     <div className="space-y-6">
       <h2 className="text-3xl font-black italic uppercase tracking-tighter">Admin Panel</h2>
 
-      <div className="flex bg-zinc-900 p-1 rounded-2xl border border-zinc-800">
-        {(['drivers', 'vehicles', 'trips'] as const).map(p => (
+      <div className="flex bg-zinc-900 p-1 rounded-2xl border border-zinc-800 overflow-x-auto no-scrollbar">
+        {(['drivers', 'vehicles', 'trips', 'settings'] as const).map(p => (
           <button 
             key={p} 
             onClick={() => setActivePanel(p)}
-            className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activePanel === p ? 'bg-zinc-800 text-safety-yellow' : 'text-zinc-500'}`}
+            className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activePanel === p ? 'bg-zinc-800 text-safety-yellow' : 'text-zinc-500'}`}
           >
             {p}
           </button>
@@ -110,6 +111,61 @@ const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle,
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {activePanel === 'settings' && (
+        <div className="space-y-6">
+          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-6">
+            <div className="flex items-center gap-3">
+              <Type size={20} className="text-safety-yellow" />
+              <h3 className="text-sm font-black uppercase text-zinc-400">Display Settings</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Base Font Size</label>
+                <span className="text-safety-yellow font-black text-sm">{state.fontSize}px</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-[8px] font-bold text-zinc-600 uppercase">Small</span>
+                <input 
+                  type="range" 
+                  min="12" 
+                  max="24" 
+                  step="1" 
+                  value={state.fontSize} 
+                  onChange={(e) => onUpdateFontSize(parseInt(e.target.value))}
+                  className="flex-1 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-safety-yellow"
+                />
+                <span className="text-[8px] font-bold text-zinc-600 uppercase">Large</span>
+              </div>
+              <p className="text-[10px] text-zinc-600 font-medium italic mt-2">
+                * Adjusting this slider will scale all text, icons, and spacings throughout the app.
+              </p>
+              
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                <button 
+                  onClick={() => onUpdateFontSize(14)}
+                  className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950"
+                >
+                  Compact
+                </button>
+                <button 
+                  onClick={() => onUpdateFontSize(16)}
+                  className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950"
+                >
+                  Normal
+                </button>
+                <button 
+                  onClick={() => onUpdateFontSize(20)}
+                  className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950"
+                >
+                  Big
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
