@@ -8,7 +8,7 @@ import MaintenanceView from './components/MaintenanceView';
 import AdminView from './components/AdminView';
 import { AppState, Trip, FuelLog, TyreStatus, Tyre, Collaborator, Driver, Vehicle, Material, Expense, MaintenanceLog } from './types';
 import { supabase } from './services/supabaseClient';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const INITIAL_TYRES: Tyre[] = Array.from({ length: 10 }, (_, i) => ({
   id: i + 1,
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(DEFAULT_STATE);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!supabase) {
@@ -55,6 +56,14 @@ const App: React.FC = () => {
 
     try {
       setIsSyncing(true);
+      setError(null);
+
+      // Perform a health check first to catch basic connection errors
+      const { error: healthError } = await supabase.from('app_settings').select('count', { count: 'exact', head: true }).limit(1);
+      
+      // If health check fails with a 404/PGRST301, the tables might not exist yet
+      // We still want to load the app with default state in that case
+      
       const [
         { data: trips },
         { data: collaborators },
@@ -75,7 +84,7 @@ const App: React.FC = () => {
         supabase.from('fuel_logs').select('*').order('created_at', { ascending: false }),
         supabase.from('expenses').select('*').order('created_at', { ascending: false }),
         supabase.from('tyres').select('*').order('id', { ascending: true }),
-        supabase.from('app_settings').select('*').single(),
+        supabase.from('app_settings').select('*').single().catch(() => ({ data: null })),
         supabase.from('maintenance_logs').select('*').order('created_at', { ascending: false })
       ]);
 
@@ -93,8 +102,9 @@ const App: React.FC = () => {
         activeVehicleId: settings?.active_vehicle_id || prev.activeVehicleId,
         fontSize: settings?.font_size || prev.fontSize,
       }));
-    } catch (error) {
-      console.error('Fetch error:', error);
+    } catch (err: any) {
+      console.error('Fetch error:', err);
+      // We don't block the app on error, but we log it
     } finally {
       setLoading(false);
       setIsSyncing(false);
@@ -124,7 +134,7 @@ const App: React.FC = () => {
     document.documentElement.style.fontSize = `${state.fontSize}px`;
   }, [state.fontSize]);
 
-  // Handlers for Collaborators
+  // Handlers
   const handleAddCollaborator = async (name: string) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('collaborators').insert([{ name }]).select();
@@ -145,7 +155,6 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, collaborators: prev.collaborators.filter(c => c.id !== id) }));
   };
 
-  // Handlers for Materials
   const handleAddMaterial = async (name: string) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('materials').insert([{ name }]).select();
@@ -166,7 +175,6 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, materials: prev.materials.filter(m => m.id !== id) }));
   };
 
-  // Other Handlers
   const handleAddTrip = async (trip: Omit<Trip, 'id' | 'created_at'> & { created_at?: string }) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('trips').insert([trip]).select();
@@ -212,9 +220,15 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 text-safety-yellow animate-spin" />
-        <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">TipperPro Cloud Sync</p>
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-6 p-6">
+        <div className="relative">
+          <Loader2 className="w-12 h-12 text-safety-yellow animate-spin" />
+          <div className="absolute inset-0 blur-xl bg-safety-yellow/20 animate-pulse"></div>
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-white font-black uppercase tracking-[0.2em] text-xs">TipperPro</p>
+          <p className="text-zinc-600 font-bold uppercase tracking-widest text-[8px]">Syncing Cloud Database...</p>
+        </div>
       </div>
     );
   }
@@ -228,6 +242,7 @@ const App: React.FC = () => {
              <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Syncing</span>
           </div>
         )}
+        
         {(() => {
           const activeVehicle = state.vehicles.find(v => v.id === state.activeVehicleId) || state.vehicles[0];
           switch (state.activeTab) {
