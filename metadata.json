@@ -1,0 +1,8 @@
+{
+  "name": "TipperPro Quarry Manager",
+  "description": "Mobile-first heavy vehicle management for tipper trucks in quarries, featuring trip tracking, fuel logs, and visual tyre maintenance.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
