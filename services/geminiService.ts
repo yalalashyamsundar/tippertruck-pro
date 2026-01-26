@@ -2,8 +2,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Trip, FuelLog, Expense } from "../types";
 
-// Always use the direct process.env.API_KEY || 'FAKE_API_KEY_FOR_DEVELOPMENT' as per @google/genai guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || 'FAKE_API_KEY_FOR_DEVELOPMENT' });
+// Always use the direct process.env.API_KEY as per @google/genai guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateDailySummary = async (trips: Trip[], expenses: Expense[], fuelLogs: FuelLog[]) => {
   // Use generateContent directly and await it for proper promise handling
@@ -15,13 +15,13 @@ export const generateDailySummary = async (trips: Trip[], expenses: Expense[], f
     Fuel: ${JSON.stringify(fuelLogs)}
     
     Format:
-    ð Daily Report: [Date]
-    â Total Trips: [X]
-    ðï¸ Total Tons: [X]
-    ð° Est Revenue: [X]
-    â½ Fuel Expense: [X]
-    ð¸ Other Expenses: [X]
-    ð Net Performance: [X]
+    🚜 Daily Report: [Date]
+    ✅ Total Trips: [X]
+    🏗️ Total Tons: [X]
+    💰 Est Revenue: [X]
+    ⛽ Fuel Expense: [X]
+    💸 Other Expenses: [X]
+    📊 Net Performance: [X]
     `,
   });
   

@@ -19,15 +19,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100 pb-24">
       <header className="sticky top-0 z-50 bg-zinc-900 border-b border-zinc-800 p-4 shadow-lg flex justify-between items-center">
-        <h1 className="text-xl font-black uppercase tracking-tighter text-safety-yellow flex items-center gap-2">
-          <div className="w-2 h-8 bg-safety-yellow"></div>
-          TipperPro
-        </h1>
+        <div className="flex flex-col">
+          <h1 className="text-xl font-black uppercase tracking-tighter text-safety-yellow flex items-center gap-2 leading-none">
+            <div className="w-2 h-6 bg-safety-yellow"></div>
+            Tipperlog
+          </h1>
+          <span className="text-[9px] font-typewriter text-zinc-500 uppercase tracking-[0.2em] ml-4 mt-1">
+            powered by Sundar
+          </span>
+        </div>
         <button 
           onClick={() => setActiveTab('admin')}
-          className={`p-2 rounded-xl border transition-all ${activeTab === 'admin' ? 'bg-safety-yellow text-zinc-950 border-safety-yellow' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
+          className={`p-2.5 rounded-xl border transition-all ${activeTab === 'admin' ? 'bg-safety-yellow text-zinc-950 border-safety-yellow' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
         >
-          <ShieldCheck size={20} />
+          <ShieldCheck size={22} />
         </button>
       </header>
 

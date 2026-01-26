@@ -1,8 +1,18 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trip, Expense, FuelLog, Driver } from '../types';
-import { TrendingUp, Truck, ShieldCheck, Share2, MapPin, Plus, Fuel, ClipboardList, UserPlus, Users, Calendar } from 'lucide-react';
-import { getNearbyFuelStations } from '../services/geminiService';
+import { 
+  TrendingUp, 
+  Truck, 
+  Share2, 
+  Plus, 
+  Fuel, 
+  ClipboardList, 
+  Users, 
+  BarChart3,
+  Briefcase
+} from 'lucide-react';
+import { subDays, format, isSameDay, parseISO } from 'date-fns';
 
 interface DashboardProps {
   trips: Trip[];
@@ -14,19 +24,35 @@ interface DashboardProps {
   onAdminClick: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ trips, expenses, fuelLogs, drivers, nextServiceKm, onQuickAction, onAdminClick }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  trips, expenses, fuelLogs, drivers, nextServiceKm, onQuickAction, onAdminClick 
+}) => {
   const [sharing, setSharing] = useState(false);
-  const [checkingMaps, setCheckingMaps] = useState(false);
-  const [mapsResult, setMapsResult] = useState<any>(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
-  const todayTrips = trips.filter(t => t.created_at.startsWith(today));
-  
-  const totalTonnage = todayTrips.reduce((acc, t) => acc + (t.unit === 'Tons' ? t.quantity : 0), 0);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayTrips = trips.filter(t => t.created_at.startsWith(todayStr));
   const totalRevenue = todayTrips.reduce((acc, t) => acc + (t.quantity * t.rate), 0);
 
-  // Driver Stats (Permanent)
+  // Performance Chart Data (Last 7 Days)
+  const chartData = useMemo(() => {
+    return Array.from({ length: 7 }).map((_, i) => {
+      const date = subDays(new Date(), 6 - i);
+      const dayTrips = trips.filter(t => isSameDay(parseISO(t.created_at), date));
+      const dayRevenue = dayTrips.reduce((acc, t) => acc + (t.quantity * t.rate), 0);
+      return {
+        label: format(date, 'EEE'),
+        trips: dayTrips.length,
+        revenue: dayRevenue,
+        fullDate: format(date, 'MMM d')
+      };
+    }).reverse();
+  }, [trips]);
+
+  const maxTrips = Math.max(...chartData.map(d => d.trips), 1);
+  const maxRevenue = Math.max(...chartData.map(d => d.revenue), 1);
+
+  // Permanent Driver Stats
   const permanentDrivers = drivers.filter(d => d.type === 'Permanent');
   const driverStats = permanentDrivers.map(d => {
     const driverTrips = trips.filter(t => t.driver_id === d.id);
@@ -35,13 +61,13 @@ const Dashboard: React.FC<DashboardProps> = ({ trips, expenses, fuelLogs, driver
   });
 
   const generateTableReport = () => {
-    let report = `🚜 DAILY TIPPER REPORT - ${today}\n`;
+    let report = `🚜 DAILY TIPPER REPORT - ${todayStr}\n`;
     report += `------------------------------------\n`;
     report += `TRIPS SUMMARY\n`;
     report += `ID | Site | Material | Qty | Rate\n`;
     report += `---|------|----------|-----|-----\n`;
     todayTrips.forEach((t, i) => {
-      report += `${i+1} | ${t.site_name.substring(0,4)} | ${t.material_type.substring(0,5)} | ${t.quantity}${t.unit === 'trips' ? 'tr' : (t.unit === 'Tons' ? 't' : 'cf')} | ₹${t.rate}\n`;
+      report += `${i+1} | ${t.site_name.substring(0,4)} | ${t.material_type.substring(0,5)} | ${t.quantity}${t.unit === 'trips' ? 'tr' : 't'} | ₹${t.rate}\n`;
     });
     report += `------------------------------------\n`;
     report += `Total Trips: ${todayTrips.length}\n`;
@@ -55,7 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ trips, expenses, fuelLogs, driver
     try {
       const tableText = generateTableReport();
       if (navigator.share) {
-        await navigator.share({ title: `Report ${today}`, text: tableText });
+        await navigator.share({ title: `Report ${todayStr}`, text: tableText });
       } else {
         await navigator.clipboard.writeText(tableText);
         alert('Table report copied to clipboard!');
@@ -67,103 +93,160 @@ const Dashboard: React.FC<DashboardProps> = ({ trips, expenses, fuelLogs, driver
     }
   };
 
-  const handleCheckStations = () => {
-    setCheckingMaps(true);
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const res = await getNearbyFuelStations(pos.coords.latitude, pos.coords.longitude);
-      setMapsResult(res);
-      setCheckingMaps(false);
-    }, () => {
-      setMapsResult("Geolocation access denied.");
-      setCheckingMaps(false);
-    });
-  };
-
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 pb-24">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-zinc-400 text-sm font-bold uppercase tracking-widest">Live Status</h2>
-          <p className="text-3xl font-black text-white italic">QUARRY DASH</p>
+          <h2 className="text-zinc-400 text-sm font-bold uppercase tracking-widest">Overview</h2>
+          <p className="text-3xl font-black text-white italic">DASHBOARD</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={onAdminClick} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 text-safety-yellow shadow-lg"><ShieldCheck size={24} /></button>
-          <button onClick={handleShare} disabled={sharing} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 active:scale-95 transition-transform"><Share2 size={24} className={sharing ? 'animate-pulse' : 'text-safety-yellow'} /></button>
-        </div>
+        <button 
+          onClick={handleShare}
+          disabled={sharing}
+          className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 text-zinc-400 active:scale-95 transition-all shadow-lg"
+        >
+          <Share2 size={24} className={sharing ? 'animate-pulse' : ''} />
+        </button>
       </div>
 
+      {/* Main Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-zinc-900 p-4 rounded-2xl border-l-4 border-safety-yellow shadow-xl">
-          <div className="flex items-center gap-2 mb-2 text-zinc-400"><TrendingUp size={16} /><span className="text-[10px] font-bold uppercase tracking-wider">Today's Trips</span></div>
-          <p className="text-4xl font-black text-white">{todayTrips.length}</p>
+        <div className="bg-zinc-900 p-4 rounded-3xl border border-zinc-800 shadow-xl overflow-hidden relative group">
+          <div className="absolute top-0 right-0 -mt-2 -mr-2 w-12 h-12 bg-safety-yellow opacity-5 rounded-full group-hover:scale-150 transition-transform"></div>
+          <div className="flex items-center gap-2 mb-2 text-zinc-500">
+            <TrendingUp size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Today Trips</span>
+          </div>
+          <p className="text-4xl font-black text-white leading-none">{todayTrips.length}</p>
+          <div className="mt-3 w-full bg-zinc-800 h-1 rounded-full overflow-hidden">
+            <div className="bg-safety-yellow h-full" style={{ width: `${Math.min((todayTrips.length / 10) * 100, 100)}%` }}></div>
+          </div>
         </div>
-        <div className="bg-zinc-900 p-4 rounded-2xl border-l-4 border-blue-500 shadow-xl">
-          <div className="flex items-center gap-2 mb-2 text-zinc-400"><Truck size={16} /><span className="text-[10px] font-bold uppercase tracking-wider">Revenue</span></div>
-          <p className="text-2xl font-black text-white">₹{totalRevenue.toLocaleString()}</p>
+        <div className="bg-zinc-900 p-4 rounded-3xl border border-zinc-800 shadow-xl overflow-hidden relative group">
+          <div className="absolute top-0 right-0 -mt-2 -mr-2 w-12 h-12 bg-emerald-500 opacity-5 rounded-full group-hover:scale-150 transition-transform"></div>
+          <div className="flex items-center gap-2 mb-2 text-zinc-500">
+            <Truck size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Rev Today</span>
+          </div>
+          <p className="text-2xl font-black text-emerald-400">₹{(totalRevenue/1000).toFixed(1)}k</p>
+          <p className="text-[10px] text-zinc-600 font-bold mt-1">Total: ₹{totalRevenue.toLocaleString()}</p>
         </div>
       </div>
 
-      {/* Driver Stats Widget */}
-      <div className="space-y-3">
-        <h3 className="text-zinc-400 text-sm font-bold uppercase tracking-widest flex items-center gap-2"><Users size={18} /> Driver Performance</h3>
-        <div className="grid grid-cols-1 gap-3">
-          {driverStats.map(ds => (
-            <div key={ds.id} className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex justify-between items-center">
-              <div>
-                <p className="font-bold text-white text-lg">{ds.name}</p>
-                <p className="text-[10px] text-emerald-500 font-black uppercase">Permanent Staff</p>
+      {/* Performance Visualization Chart */}
+      <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+            <BarChart3 size={14} className="text-safety-yellow" />
+            Weekly Performance
+          </h3>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-safety-yellow"></div>
+              <span className="text-[8px] font-bold text-zinc-600 uppercase">Trips</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-zinc-600"></div>
+              <span className="text-[8px] font-bold text-zinc-600 uppercase">Rev</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-end justify-between h-40 pt-2 gap-2">
+          {chartData.map((day, idx) => (
+            <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+              <div className="w-full flex justify-center gap-0.5 items-end h-full">
+                {/* Trips Bar */}
+                <div 
+                  className="w-2.5 bg-safety-yellow rounded-t-sm chart-bar shadow-[0_0_10px_rgba(255,215,0,0.2)]" 
+                  style={{ height: `${(day.trips / maxTrips) * 100}%` }}
+                ></div>
+                {/* Revenue Bar */}
+                <div 
+                  className="w-1.5 bg-zinc-700 rounded-t-sm chart-bar" 
+                  style={{ height: `${(day.revenue / maxRevenue) * 100}%` }}
+                ></div>
               </div>
-              <div className="flex gap-4">
-                <div className="text-center">
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase">Days</p>
-                  <p className="text-xl font-black text-white">{ds.presentDays}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase">Trips</p>
-                  <p className="text-xl font-black text-safety-yellow">{ds.tripCount}</p>
-                </div>
-              </div>
+              <span className="text-[9px] font-black text-zinc-600 uppercase">{day.label}</span>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Driver Stats Section */}
       <div className="space-y-3">
-        <h3 className="text-zinc-400 text-sm font-bold uppercase tracking-widest flex items-center gap-2"><Truck size={18} /> Vehicle Health</h3>
-        <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center text-safety-yellow"><ShieldCheck size={24} /></div>
-              <div><p className="font-bold text-white">Service Due In</p><p className="text-xs text-zinc-500 uppercase font-black">{nextServiceKm} KM</p></div>
+        <h3 className="text-zinc-500 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 px-1">
+          <Users size={14} className="text-safety-yellow" />
+          Staff Activity
+        </h3>
+        <div className="space-y-3">
+          {driverStats.length > 0 ? driverStats.map(ds => (
+            <div key={ds.id} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 flex justify-between items-center shadow-lg hover:border-zinc-700 transition-colors">
+              <div>
+                <p className="font-black text-white uppercase text-sm tracking-tight">{ds.name}</p>
+                <div className="flex items-center gap-2 mt-1">
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                   <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Active Partner</p>
+                </div>
+              </div>
+              <div className="flex gap-4 border-l border-zinc-800 pl-4">
+                <div className="text-center">
+                  <p className="text-[8px] text-zinc-600 font-black uppercase">Days</p>
+                  <p className="text-lg font-black text-white">{ds.presentDays}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[8px] text-zinc-600 font-black uppercase">Trips</p>
+                  <p className="text-lg font-black text-safety-yellow">{ds.tripCount}</p>
+                </div>
+              </div>
             </div>
-          </div>
+          )) : (
+            <div className="bg-zinc-900/50 p-6 rounded-3xl text-center border border-dashed border-zinc-800">
+              <p className="text-zinc-600 text-[10px] font-black uppercase italic">No permanent staff registered</p>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="mt-8">
-        <button onClick={handleCheckStations} disabled={checkingMaps} className="w-full bg-zinc-800 hover:bg-zinc-700 py-4 px-6 rounded-2xl border-2 border-zinc-700 flex items-center justify-center gap-3 transition-colors disabled:opacity-50"><MapPin size={24} className="text-safety-yellow" /><span className="font-bold uppercase tracking-widest">{checkingMaps ? 'Searching...' : 'Fuel Stations Near Me'}</span></button>
-        {mapsResult && <div className="mt-4 p-4 bg-zinc-900 border border-zinc-700 rounded-xl text-sm leading-relaxed text-zinc-300">{typeof mapsResult === 'string' ? mapsResult : mapsResult.text}</div>}
-      </div>
-
-      {/* Multi-action FAB */}
+      {/* Quick Access Multiaction FAB */}
       <div className="fixed bottom-24 right-6 z-[60] flex flex-col items-end gap-3">
         {showFabMenu && (
-          <div className="flex flex-col items-end gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex flex-col items-end gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200 mb-2">
             <div className="flex items-center gap-3">
-              <span className="bg-zinc-900 px-3 py-1 rounded-lg text-[10px] font-black uppercase text-white shadow-xl">Add Trip</span>
-              <button onClick={() => { onQuickAction('trip'); setShowFabMenu(false); }} className="bg-zinc-800 p-4 rounded-full border border-zinc-700 text-safety-yellow shadow-2xl"><ClipboardList size={24} /></button>
+              <span className="bg-zinc-900 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-white shadow-2xl border border-zinc-800">Add General Trip</span>
+              <button 
+                onClick={() => { onQuickAction('trip'); setShowFabMenu(false); }}
+                className="bg-zinc-800 p-4 rounded-full border border-zinc-700 text-safety-yellow shadow-2xl active:scale-90"
+              >
+                <ClipboardList size={24} />
+              </button>
             </div>
             <div className="flex items-center gap-3">
-              <span className="bg-zinc-900 px-3 py-1 rounded-lg text-[10px] font-black uppercase text-white shadow-xl">Add Fuel</span>
-              <button onClick={() => { onQuickAction('fuel'); setShowFabMenu(false); }} className="bg-zinc-800 p-4 rounded-full border border-zinc-700 text-emerald-500 shadow-2xl"><Fuel size={24} /></button>
+              <span className="bg-zinc-900 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-white shadow-2xl border border-zinc-800">Add to Collaborator</span>
+              <button 
+                onClick={() => { onQuickAction('collab'); setShowFabMenu(false); }}
+                className="bg-zinc-800 p-4 rounded-full border border-zinc-700 text-blue-500 shadow-2xl active:scale-90"
+              >
+                <Briefcase size={24} />
+              </button>
             </div>
             <div className="flex items-center gap-3">
-              <span className="bg-zinc-900 px-3 py-1 rounded-lg text-[10px] font-black uppercase text-white shadow-xl">Add Collab</span>
-              <button onClick={() => { onQuickAction('collab'); setShowFabMenu(false); }} className="bg-zinc-800 p-4 rounded-full border border-zinc-700 text-blue-500 shadow-2xl"><UserPlus size={24} /></button>
+              <span className="bg-zinc-900 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-white shadow-2xl border border-zinc-800">Add Fuel Log</span>
+              <button 
+                onClick={() => { onQuickAction('fuel'); setShowFabMenu(false); }}
+                className="bg-zinc-800 p-4 rounded-full border border-zinc-700 text-emerald-500 shadow-2xl active:scale-90"
+              >
+                <Fuel size={24} />
+              </button>
             </div>
           </div>
         )}
-        <button onClick={() => setShowFabMenu(!showFabMenu)} className={`bg-safety-yellow text-zinc-950 p-5 rounded-full shadow-2xl transition-transform duration-200 ${showFabMenu ? 'rotate-45' : ''}`}><Plus size={32} strokeWidth={3} /></button>
+        <button 
+          onClick={() => setShowFabMenu(!showFabMenu)}
+          className={`bg-safety-yellow text-zinc-950 p-5 rounded-full shadow-2xl transition-transform duration-300 border-4 border-zinc-950 ${showFabMenu ? 'rotate-45 scale-110' : 'scale-100'}`}
+        >
+          <Plus size={32} strokeWidth={4} />
+        </button>
       </div>
     </div>
   );

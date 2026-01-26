@@ -23,7 +23,7 @@ const INITIAL_MATERIALS: Material[] = [
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem('tipper_state_v3');
+    const saved = localStorage.getItem('tipper_state_v4');
     if (saved) return JSON.parse(saved);
     return {
       activeTab: 'dashboard',
@@ -45,7 +45,7 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('tipper_state_v3', JSON.stringify(state));
+    localStorage.setItem('tipper_state_v4', JSON.stringify(state));
   }, [state]);
 
   const handleAddTrip = (trip: Omit<Trip, 'id' | 'created_at'> & { created_at?: string }) => {
@@ -118,11 +118,10 @@ const App: React.FC = () => {
             expenses={state.expenses} 
             fuelLogs={state.fuelLogs}
             drivers={state.drivers}
-            nextServiceKm={activeVehicle.current_odometer % 5000 === 0 ? 5000 : 5000 - (activeVehicle.current_odometer % 5000)}
+            nextServiceKm={activeVehicle ? (activeVehicle.current_odometer % 5000 === 0 ? 5000 : 5000 - (activeVehicle.current_odometer % 5000)) : 5000}
             onQuickAction={(type) => {
-              if(type === 'trip') setState(prev => ({ ...prev, activeTab: 'trips' }));
-              if(type === 'fuel') setState(prev => ({ ...prev, activeTab: 'expenses' }));
-              if(type === 'collab') setState(prev => ({ ...prev, activeTab: 'trips' }));
+              setState(prev => ({ ...prev, activeTab: 'trips' }));
+              // Logic to handle auto-open of specific form can be added here if needed
             }}
             onAdminClick={() => setState(prev => ({ ...prev, activeTab: 'admin' }))}
           />
