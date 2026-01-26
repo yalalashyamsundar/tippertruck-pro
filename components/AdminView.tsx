@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppState, Driver, Vehicle, Trip } from '../types';
-import { UserPlus, Truck, Trash2, Edit2, Check, X, Type, Sun, Moon } from 'lucide-react';
+import { UserPlus, Truck, Trash2, Edit2, Check, X, Type, Database, Activity, AlertCircle, RefreshCcw } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface AdminViewProps {
   state: AppState;
@@ -19,6 +20,31 @@ const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle,
 
   const [newDriver, setNewDriver] = useState({ name: '', type: 'Permanent' as 'Permanent' | 'Temporary' });
   const [newVehicle, setNewVehicle] = useState({ reg_number: '', current_odometer: 0 });
+
+  // Diagnostics state
+  const [diagResults, setDiagResults] = useState<{table: string, status: 'ok' | 'error' | 'pending', error?: string}[]>([]);
+  const [isRunningDiag, setIsRunningDiag] = useState(false);
+
+  const runDiagnostics = async () => {
+    setIsRunningDiag(true);
+    const tables = ['trips', 'vehicles', 'drivers', 'materials', 'collaborators', 'fuel_logs', 'expenses', 'tyres', 'app_settings'];
+    const results = [];
+
+    for (const table of tables) {
+      try {
+        const { error } = await supabase.from(table).select('count').limit(1);
+        results.push({
+          table,
+          status: error ? 'error' : 'ok',
+          error: error?.message
+        });
+      } catch (e: any) {
+        results.push({ table, status: 'error', error: e.message });
+      }
+    }
+    setDiagResults(results as any);
+    setIsRunningDiag(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -52,7 +78,7 @@ const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle,
           <div className="space-y-2">
             {state.drivers.map(d => (
               <div key={d.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex justify-between items-center">
-                <div><p className="font-black">{d.name}</p><p className="text-[10px] font-bold text-zinc-500 uppercase">{d.type}</p></div>
+                <div><p className="font-black text-sm">{d.name}</p></div>
                 <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border ${d.type === 'Permanent' ? 'border-emerald-500/20 text-emerald-500' : 'border-orange-500/20 text-orange-500'}`}>{d.type}</div>
               </div>
             ))}
@@ -116,6 +142,55 @@ const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle,
 
       {activePanel === 'settings' && (
         <div className="space-y-6">
+          {/* Database Diagnostics Tool */}
+          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Database size={20} className="text-safety-yellow" />
+                <h3 className="text-sm font-black uppercase text-zinc-400">Database Diagnostics</h3>
+              </div>
+              <button 
+                onClick={runDiagnostics} 
+                disabled={isRunningDiag}
+                className="bg-zinc-800 p-2 rounded-xl text-safety-yellow active:rotate-180 transition-transform duration-500"
+              >
+                <RefreshCcw size={16} className={isRunningDiag ? 'animate-spin' : ''} />
+              </button>
+            </div>
+            
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+              Verify if the Supabase project 'Tipperlog' and all tables are connected correctly.
+            </p>
+
+            <div className="space-y-2 mt-4">
+              {diagResults.length > 0 ? diagResults.map(res => (
+                <div key={res.table} className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase text-zinc-400">{res.table}</span>
+                  <div className="flex items-center gap-2">
+                    {res.status === 'ok' ? (
+                      <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                         <span className="text-[8px] font-black text-emerald-500 uppercase">Step Verified</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                         <AlertCircle size={10} className="text-red-500" />
+                         <span className="text-[8px] font-black text-red-500 uppercase">Missing Table</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <button 
+                  onClick={runDiagnostics}
+                  className="w-full py-4 bg-zinc-950 border border-zinc-800 border-dashed rounded-2xl text-[10px] font-black uppercase text-zinc-600 hover:text-safety-yellow transition-colors"
+                >
+                  Click to Verify Connection Steps
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-6">
             <div className="flex items-center gap-3">
               <Type size={20} className="text-safety-yellow" />
@@ -140,29 +215,11 @@ const AdminView: React.FC<AdminViewProps> = ({ state, onAddDriver, onAddVehicle,
                 />
                 <span className="text-[8px] font-bold text-zinc-600 uppercase">Large</span>
               </div>
-              <p className="text-[10px] text-zinc-600 font-medium italic mt-2">
-                * Adjusting this slider will scale all text, icons, and spacings throughout the app.
-              </p>
               
               <div className="grid grid-cols-3 gap-2 mt-4">
-                <button 
-                  onClick={() => onUpdateFontSize(14)}
-                  className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950"
-                >
-                  Compact
-                </button>
-                <button 
-                  onClick={() => onUpdateFontSize(16)}
-                  className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950"
-                >
-                  Normal
-                </button>
-                <button 
-                  onClick={() => onUpdateFontSize(20)}
-                  className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950"
-                >
-                  Big
-                </button>
+                <button onClick={() => onUpdateFontSize(14)} className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950">Compact</button>
+                <button onClick={() => onUpdateFontSize(16)} className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950">Normal</button>
+                <button onClick={() => onUpdateFontSize(20)} className="py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 active:bg-safety-yellow active:text-zinc-950">Big</button>
               </div>
             </div>
           </div>

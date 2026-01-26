@@ -1,8 +1,10 @@
 
-import React from 'react';
-import { Home, ClipboardList, Fuel, Settings, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, ClipboardList, Fuel, Settings, ShieldCheck, Cloud, CloudOff, AlertCircle } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface LayoutProps {
+  // Use React.ReactNode for standard React component children in TypeScript
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: any) => void;
@@ -29,6 +31,21 @@ const AppLogo = () => (
 );
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
+  const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const { error } = await supabase.from('app_settings').select('id').limit(1);
+        if (error) throw error;
+        setDbStatus('connected');
+      } catch (e) {
+        setDbStatus('error');
+      }
+    };
+    checkConnection();
+  }, []);
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'trips', label: 'Trips', icon: ClipboardList },
@@ -41,13 +58,25 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       <header className="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 p-4 shadow-lg flex justify-between items-center">
         <div className="flex items-center gap-3">
           <AppLogo />
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col">
             <h1 className="text-xl font-black uppercase tracking-tighter text-white leading-none">
               Tipperlog
             </h1>
-            <span className="text-[5px] font-typewriter text-zinc-500 uppercase tracking-[0.2em] mt-0.5">
-              powered by Sundar
-            </span>
+            <div className="flex items-center gap-1.5 mt-1">
+              {dbStatus === 'connected' ? (
+                <div className="flex items-center gap-1">
+                  <Cloud size={8} className="text-emerald-500" />
+                  <span className="text-[6px] font-black text-emerald-500 uppercase tracking-widest">Cloud Synced</span>
+                </div>
+              ) : dbStatus === 'error' ? (
+                <div className="flex items-center gap-1">
+                  <CloudOff size={8} className="text-red-500" />
+                  <span className="text-[6px] font-black text-red-500 uppercase tracking-widest">Offline / Auth Error</span>
+                </div>
+              ) : (
+                <span className="text-[6px] font-black text-zinc-500 uppercase tracking-widest animate-pulse">Connecting...</span>
+              )}
+            </div>
           </div>
         </div>
         <button 
