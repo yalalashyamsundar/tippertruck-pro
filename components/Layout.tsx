@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Home, ClipboardList, Fuel, Settings, ShieldCheck, Cloud, CloudOff, AlertCircle } from 'lucide-react';
+import { Home, ClipboardList, Fuel, Settings, User, Cloud, CloudOff, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface LayoutProps {
@@ -82,8 +82,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
           <button 
             onClick={() => setActiveTab('admin')}
             className={`p-2.5 rounded-xl border transition-all ${activeTab === 'admin' ? 'bg-safety-yellow text-zinc-950 border-safety-yellow shadow-[0_0_15px_rgba(255,215,0,0.2)]' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
+            title="Admin Panel"
           >
-            <ShieldCheck size={22} />
+            <User size={22} />
           </button>
         </div>
       </header>
