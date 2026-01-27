@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Home, ClipboardList, Fuel, Settings, User, Cloud, CloudOff, AlertCircle } from 'lucide-react';
+import { Home, ClipboardList, Fuel, Settings, User } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface LayoutProps {
-  // Use React.ReactNode for standard React component children in TypeScript
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: any) => void;
@@ -31,21 +30,6 @@ const AppLogo = () => (
 );
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
-  const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
-
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const { error } = await supabase.from('app_settings').select('id').limit(1);
-        if (error) throw error;
-        setDbStatus('connected');
-      } catch (e) {
-        setDbStatus('error');
-      }
-    };
-    checkConnection();
-  }, []);
-
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'trips', label: 'Trips', icon: ClipboardList },
@@ -69,16 +53,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10">
-            {dbStatus === 'connected' ? (
-              <Cloud size={22} className="text-emerald-500 transition-colors" />
-            ) : dbStatus === 'error' ? (
-              <CloudOff size={22} className="text-red-500 transition-colors" />
-            ) : (
-              <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
-            )}
-          </div>
-          
           <button 
             onClick={() => setActiveTab('admin')}
             className={`p-2.5 rounded-xl border transition-all ${activeTab === 'admin' ? 'bg-safety-yellow text-zinc-950 border-safety-yellow shadow-[0_0_15px_rgba(255,215,0,0.2)]' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}

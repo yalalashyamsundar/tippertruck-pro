@@ -17,7 +17,8 @@ import {
   Search,
   TrendingUp,
   Check,
-  Star
+  Star,
+  Loader2
 } from 'lucide-react';
 import { 
   format, 
@@ -63,6 +64,7 @@ const TripsView: React.FC<TripsViewProps> = ({
   const [showManageCollabs, setShowManageCollabs] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedCollabId, setSelectedCollabId] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -110,6 +112,31 @@ const TripsView: React.FC<TripsViewProps> = ({
       }));
     }
   }, [subTab, materials]);
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setFormData(prev => ({ 
+          ...prev, 
+          site_name: `Loc: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}` 
+        }));
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error(error);
+        alert("Unable to retrieve your location. Please ensure GPS is enabled.");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,7 +423,25 @@ const TripsView: React.FC<TripsViewProps> = ({
 
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-zinc-500">Site Name</label>
-              <input type="text" placeholder="Enter Site Name" value={formData.site_name} onChange={(e)=>setFormData({...formData, site_name: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 font-bold text-white" required />
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Enter Site Name" 
+                  value={formData.site_name} 
+                  onChange={(e)=>setFormData({...formData, site_name: e.target.value})} 
+                  className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 pr-14 font-bold text-white focus:border-safety-yellow outline-none transition-all" 
+                  required 
+                />
+                <button 
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={isLocating}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-800 p-2.5 rounded-xl text-safety-yellow hover:bg-zinc-700 active:scale-90 transition-all border border-zinc-700"
+                  title="Tag Current Location"
+                >
+                  {isLocating ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-zinc-500">Material</label>
