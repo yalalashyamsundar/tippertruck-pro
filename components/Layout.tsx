@@ -58,33 +58,34 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       <header className="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 p-4 shadow-lg flex justify-between items-center">
         <div className="flex items-center gap-3">
           <AppLogo />
-          <div className="flex flex-col">
+          <div className="flex flex-col items-end">
             <h1 className="text-xl font-black uppercase tracking-tighter text-white leading-none">
               Tipperlog
             </h1>
-            <div className="flex items-center gap-1.5 mt-1">
-              {dbStatus === 'connected' ? (
-                <div className="flex items-center gap-1">
-                  <Cloud size={8} className="text-emerald-500" />
-                  <span className="text-[6px] font-black text-emerald-500 uppercase tracking-widest">Cloud Synced</span>
-                </div>
-              ) : dbStatus === 'error' ? (
-                <div className="flex items-center gap-1">
-                  <CloudOff size={8} className="text-red-500" />
-                  <span className="text-[6px] font-black text-red-500 uppercase tracking-widest">Offline / Auth Error</span>
-                </div>
-              ) : (
-                <span className="text-[6px] font-black text-zinc-500 uppercase tracking-widest animate-pulse">Connecting...</span>
-              )}
-            </div>
+            <p className="text-[5px] font-bold uppercase tracking-[0.2em] text-safety-yellow/80 mt-0.5 leading-none">
+              powered by Sundar
+            </p>
           </div>
         </div>
-        <button 
-          onClick={() => setActiveTab('admin')}
-          className={`p-2.5 rounded-xl border transition-all ${activeTab === 'admin' ? 'bg-safety-yellow text-zinc-950 border-safety-yellow' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
-        >
-          <ShieldCheck size={22} />
-        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10">
+            {dbStatus === 'connected' ? (
+              <Cloud size={22} className="text-emerald-500 transition-colors" />
+            ) : dbStatus === 'error' ? (
+              <CloudOff size={22} className="text-red-500 transition-colors" />
+            ) : (
+              <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+            )}
+          </div>
+          
+          <button 
+            onClick={() => setActiveTab('admin')}
+            className={`p-2.5 rounded-xl border transition-all ${activeTab === 'admin' ? 'bg-safety-yellow text-zinc-950 border-safety-yellow shadow-[0_0_15px_rgba(255,215,0,0.2)]' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
+          >
+            <ShieldCheck size={22} />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 py-6">
