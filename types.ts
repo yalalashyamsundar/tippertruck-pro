@@ -93,5 +93,6 @@ export type AppState = {
   maintenance: MaintenanceLog[];
   tyres: Tyre[];
   activeVehicleId: string;
+  defaultCollaboratorId: string | null;
   fontSize: number;
 };

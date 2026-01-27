@@ -20,7 +20,8 @@ import {
   Search,
   ArrowUpDown,
   TrendingUp,
-  Check
+  Check,
+  Star
 } from 'lucide-react';
 import { 
   format, 
@@ -42,6 +43,8 @@ interface TripsViewProps {
   drivers: Driver[];
   vehicles: Vehicle[];
   materials: Material[];
+  defaultCollaboratorId: string | null;
+  onSetDefaultCollaborator: (id: string | null) => void;
   onAddTrip: (trip: Omit<Trip, 'id' | 'created_at'> & { created_at?: string }) => void;
   onAddCollaborator: (name: string) => void;
   onUpdateCollaborator: (id: string, name: string) => void;
@@ -56,6 +59,7 @@ type SortDirection = 'asc' | 'desc';
 
 const TripsView: React.FC<TripsViewProps> = ({ 
   trips, collaborators, drivers, vehicles, materials, 
+  defaultCollaboratorId, onSetDefaultCollaborator,
   onAddTrip, onAddCollaborator, onUpdateCollaborator, onDeleteCollaborator, onAddMaterial, onDeleteMaterial, onUpdateMaterial 
 }) => {
   const [subTab, setSubTab] = useState<'general' | 'collaboration'>('collaboration');
@@ -90,6 +94,16 @@ const TripsView: React.FC<TripsViewProps> = ({
     vehicle_id: vehicles[0]?.id || '',
     driver_id: drivers[0]?.id || '',
   });
+
+  // Pre-select default partner when switch to collaboration tab
+  useEffect(() => {
+    if (subTab === 'collaboration' && !selectedCollabId && defaultCollaboratorId) {
+      // Only set if the default partner actually exists in collaborators list
+      if (collaborators.some(c => c.id === defaultCollaboratorId)) {
+        setSelectedCollabId(defaultCollaboratorId);
+      }
+    }
+  }, [subTab, defaultCollaboratorId, collaborators, selectedCollabId]);
 
   useEffect(() => {
     if (subTab === 'collaboration') {
@@ -278,11 +292,14 @@ const TripsView: React.FC<TripsViewProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
                 <h3 className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Active Partner</h3>
-                <button onClick={() => setShowManageCollabs(true)} className="bg-zinc-800 px-3 py-1.5 rounded-lg text-safety-yellow text-[10px] font-black uppercase flex items-center gap-1 border border-zinc-700 shadow-sm"><Settings size={12} /> Manage Partner</button>
+                <button onClick={() => setShowManageCollabs(true)} className="bg-zinc-800 px-3 py-1.5 rounded-lg text-safety-yellow text-[10px] font-black uppercase flex items-center gap-1 border border-zinc-700 shadow-sm"><Settings size={12} /> Manage Partners</button>
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                 {collaborators.map(c => (
-                  <button key={c.id} onClick={() => setSelectedCollabId(c.id)} className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all ${selectedCollabId === c.id ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>{c.name}</button>
+                  <button key={c.id} onClick={() => setSelectedCollabId(c.id)} className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${selectedCollabId === c.id ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
+                    {c.name}
+                    {defaultCollaboratorId === c.id && <Star size={10} className="absolute top-1 right-1 fill-zinc-950 text-zinc-950" />}
+                  </button>
                 ))}
               </div>
             </div>
@@ -398,17 +415,27 @@ const TripsView: React.FC<TripsViewProps> = ({
             <div className="space-y-3 pb-20">
               {collaborators.map(c => {
                 const summary = getCollabSummary(c.id);
+                const isDefault = defaultCollaboratorId === c.id;
                 return (
-                  <div key={c.id} className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex flex-col gap-3">
+                  <div key={c.id} className={`bg-zinc-900 p-5 rounded-2xl border flex flex-col gap-3 transition-colors ${isDefault ? 'border-safety-yellow/40 bg-zinc-900/80' : 'border-zinc-800'}`}>
                     <div className="flex justify-between items-center">
-                      {editingCollabId === c.id ? (
-                        <div className="flex-1 flex gap-2">
-                          <input autoFocus value={editingCollabName} onChange={e=>setEditingCollabName(e.target.value)} className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-white font-bold border border-safety-yellow outline-none" />
-                          <button onClick={() => saveEditCollab(c.id)} className="p-2 bg-emerald-500 text-zinc-950 rounded-lg"><Check size={16}/></button>
-                        </div>
-                      ) : (
-                        <p className="font-black text-white text-lg italic tracking-tight uppercase">{c.name}</p>
-                      )}
+                      <div className="flex items-center gap-2 flex-1">
+                        <button 
+                          onClick={() => onSetDefaultCollaborator(isDefault ? null : c.id)}
+                          className={`p-1.5 rounded-lg transition-all ${isDefault ? 'bg-safety-yellow/20 text-safety-yellow' : 'bg-zinc-800 text-zinc-600 hover:text-safety-yellow'}`}
+                          title={isDefault ? "Unset default" : "Set as default"}
+                        >
+                          <Star size={16} className={isDefault ? 'fill-safety-yellow' : ''} />
+                        </button>
+                        {editingCollabId === c.id ? (
+                          <div className="flex-1 flex gap-2">
+                            <input autoFocus value={editingCollabName} onChange={e=>setEditingCollabName(e.target.value)} className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-white font-bold border border-safety-yellow outline-none" />
+                            <button onClick={() => saveEditCollab(c.id)} className="p-2 bg-emerald-500 text-zinc-950 rounded-lg"><Check size={16}/></button>
+                          </div>
+                        ) : (
+                          <p className={`font-black text-lg italic tracking-tight uppercase ${isDefault ? 'text-safety-yellow' : 'text-white'}`}>{c.name}</p>
+                        )}
+                      </div>
                       <div className="flex gap-1 ml-2">
                         {!editingCollabId && <button onClick={()=>startEditCollab(c)} className="p-2 text-zinc-500 hover:text-safety-yellow"><Edit2 size={16}/></button>}
                         <button onClick={()=>onDeleteCollaborator(c.id)} className="p-2 text-red-500/60 hover:text-red-500"><Trash2 size={16}/></button>
@@ -423,6 +450,11 @@ const TripsView: React.FC<TripsViewProps> = ({
                         <IndianRupee size={10} className="text-emerald-500"/>
                         <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">₹{summary.amount.toLocaleString()}</span>
                       </div>
+                      {isDefault && (
+                        <div className="ml-auto px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-md">
+                          <span className="text-[8px] font-black text-safety-yellow uppercase tracking-widest">Default Partner</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

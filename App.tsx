@@ -39,6 +39,7 @@ const DEFAULT_STATE: AppState = {
   maintenance: [],
   tyres: INITIAL_TYRES,
   activeVehicleId: 'v1',
+  defaultCollaboratorId: null,
   fontSize: 16,
 };
 
@@ -101,6 +102,7 @@ const App: React.FC = () => {
         maintenance: maintenance || [],
         tyres: tyres && tyres.length > 0 ? tyres : INITIAL_TYRES,
         activeVehicleId: settings?.active_vehicle_id || prev.activeVehicleId,
+        defaultCollaboratorId: settings?.default_collaborator_id || null,
         fontSize: settings?.font_size || prev.fontSize,
       }));
     } catch (err: any) {
@@ -120,6 +122,7 @@ const App: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_logs' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborators' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchData())
       .subscribe();
 
     return () => {
@@ -131,7 +134,7 @@ const App: React.FC = () => {
     document.documentElement.style.fontSize = `${state.fontSize}px`;
   }, [state.fontSize]);
 
-  // Handlers (Simplified for safety)
+  // Handlers
   const handleAddTrip = async (trip: any) => {
     const { data, error } = await supabase.from('trips').insert([trip]).select();
     if (!error && data) setState(prev => ({ ...prev, trips: [data[0], ...prev.trips] }));
@@ -155,6 +158,11 @@ const App: React.FC = () => {
   const handleUpdateFontSize = async (size: number) => {
     await supabase.from('app_settings').upsert({ id: 1, font_size: size });
     setState(prev => ({ ...prev, fontSize: size }));
+  };
+
+  const handleSetDefaultCollaborator = async (id: string | null) => {
+    await supabase.from('app_settings').upsert({ id: 1, default_collaborator_id: id });
+    setState(prev => ({ ...prev, defaultCollaboratorId: id }));
   };
 
   if (loading) {
@@ -185,7 +193,7 @@ const App: React.FC = () => {
             case 'dashboard':
               return <Dashboard trips={state.trips} expenses={state.expenses} fuelLogs={state.fuelLogs} drivers={state.drivers} nextServiceKm={activeVehicle ? (5000 - (activeVehicle.current_odometer % 5000)) : 5000} onQuickAction={() => setState(prev => ({ ...prev, activeTab: 'trips' }))} onAdminClick={() => setState(prev => ({ ...prev, activeTab: 'admin' }))} />;
             case 'trips':
-              return <TripsView trips={state.trips} collaborators={state.collaborators} drivers={state.drivers} vehicles={state.vehicles} materials={state.materials} onAddTrip={handleAddTrip} onAddCollaborator={(name) => supabase.from('collaborators').insert([{name}]).then(fetchData)} onUpdateCollaborator={(id, name) => supabase.from('collaborators').update({name}).eq('id', id).then(fetchData)} onDeleteCollaborator={(id) => supabase.from('collaborators').delete().eq('id', id).then(fetchData)} onAddMaterial={(name) => supabase.from('materials').insert([{name}]).then(fetchData)} onDeleteMaterial={(id) => supabase.from('materials').delete().eq('id', id).then(fetchData)} onUpdateMaterial={(id, name) => supabase.from('materials').update({name}).eq('id', id).then(fetchData)} />;
+              return <TripsView trips={state.trips} collaborators={state.collaborators} drivers={state.drivers} vehicles={state.vehicles} materials={state.materials} defaultCollaboratorId={state.defaultCollaboratorId} onSetDefaultCollaborator={handleSetDefaultCollaborator} onAddTrip={handleAddTrip} onAddCollaborator={(name) => supabase.from('collaborators').insert([{name}]).then(fetchData)} onUpdateCollaborator={(id, name) => supabase.from('collaborators').update({name}).eq('id', id).then(fetchData)} onDeleteCollaborator={(id) => supabase.from('collaborators').delete().eq('id', id).then(fetchData)} onAddMaterial={(name) => supabase.from('materials').insert([{name}]).then(fetchData)} onDeleteMaterial={(id) => supabase.from('materials').delete().eq('id', id).then(fetchData)} onUpdateMaterial={(id, name) => supabase.from('materials').update({name}).eq('id', id).then(fetchData)} />;
             case 'expenses':
               return <ExpensesView fuelLogs={state.fuelLogs} onAddFuel={handleAddFuel} vehicles={state.vehicles} />;
             case 'maintenance':
