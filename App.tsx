@@ -150,6 +150,21 @@ const App: React.FC = () => {
     fetchData();
   };
 
+  const handleDeleteVehicle = async (id: string) => {
+    await supabase.from('vehicles').delete().eq('id', id);
+    fetchData();
+  };
+
+  const handleUpdateDriver = async (id: string, updates: any) => {
+    await supabase.from('drivers').update(updates).eq('id', id);
+    fetchData();
+  };
+
+  const handleDeleteDriver = async (id: string) => {
+    await supabase.from('drivers').delete().eq('id', id);
+    fetchData();
+  };
+
   const handleUpdateTyre = async (id: number, status: any) => {
     await supabase.from('tyres').upsert({ id, status });
     fetchData();
@@ -191,15 +206,27 @@ const App: React.FC = () => {
           const activeVehicle = state.vehicles.find(v => v.id === state.activeVehicleId) || state.vehicles[0];
           switch (state.activeTab) {
             case 'dashboard':
-              return <Dashboard trips={state.trips} expenses={state.expenses} fuelLogs={state.fuelLogs} drivers={state.drivers} nextServiceKm={activeVehicle ? (5000 - (activeVehicle.current_odometer % 5000)) : 5000} onQuickAction={() => setState(prev => ({ ...prev, activeTab: 'trips' }))} onAdminClick={() => setState(prev => ({ ...prev, activeTab: 'admin' }))} />;
+              // FIX: Added missing 'vehicles' prop and matched 'onQuickAction' signature
+              return (
+                <Dashboard 
+                  trips={state.trips} 
+                  expenses={state.expenses} 
+                  fuelLogs={state.fuelLogs} 
+                  drivers={state.drivers} 
+                  vehicles={state.vehicles}
+                  nextServiceKm={activeVehicle ? (5000 - (activeVehicle.current_odometer % 5000)) : 5000} 
+                  onQuickAction={(type) => setState(prev => ({ ...prev, activeTab: 'trips' }))} 
+                  onAdminClick={() => setState(prev => ({ ...prev, activeTab: 'admin' }))} 
+                />
+              );
             case 'trips':
               return <TripsView trips={state.trips} collaborators={state.collaborators} drivers={state.drivers} vehicles={state.vehicles} materials={state.materials} defaultCollaboratorId={state.defaultCollaboratorId} onSetDefaultCollaborator={handleSetDefaultCollaborator} onAddTrip={handleAddTrip} onAddCollaborator={(name) => supabase.from('collaborators').insert([{name}]).then(fetchData)} onUpdateCollaborator={(id, name) => supabase.from('collaborators').update({name}).eq('id', id).then(fetchData)} onDeleteCollaborator={(id) => supabase.from('collaborators').delete().eq('id', id).then(fetchData)} onAddMaterial={(name) => supabase.from('materials').insert([{name}]).then(fetchData)} onDeleteMaterial={(id) => supabase.from('materials').delete().eq('id', id).then(fetchData)} onUpdateMaterial={(id, name) => supabase.from('materials').update({name}).eq('id', id).then(fetchData)} />;
             case 'expenses':
               return <ExpensesView fuelLogs={state.fuelLogs} onAddFuel={handleAddFuel} vehicles={state.vehicles} />;
             case 'maintenance':
-              return <MaintenanceView tyres={state.tyres} vehicles={state.vehicles} maintenanceLogs={state.maintenance} onUpdateTyre={handleUpdateTyre} onAddVehicle={(v) => supabase.from('vehicles').insert([v]).then(fetchData)} onUpdateVehicle={handleUpdateVehicle} onDeleteVehicle={(id) => supabase.from('vehicles').delete().eq('id', id).then(fetchData)} />;
+              return <MaintenanceView tyres={state.tyres} vehicles={state.vehicles} maintenanceLogs={state.maintenance} onUpdateTyre={handleUpdateTyre} onAddVehicle={(v) => supabase.from('vehicles').insert([v]).then(fetchData)} onUpdateVehicle={handleUpdateVehicle} onDeleteVehicle={handleDeleteVehicle} />;
             case 'admin':
-              return <AdminView state={state} onAddDriver={(d) => supabase.from('drivers').insert([d]).then(fetchData)} onAddVehicle={(v) => supabase.from('vehicles').insert([v]).then(fetchData)} onDeleteTrip={(id) => supabase.from('trips').delete().eq('id', id).then(fetchData)} onUpdateTrip={(t) => supabase.from('trips').update(t).eq('id', t.id).then(fetchData)} onUpdateFontSize={handleUpdateFontSize} />;
+              return <AdminView state={state} onAddDriver={(d) => supabase.from('drivers').insert([d]).then(fetchData)} onUpdateDriver={handleUpdateDriver} onDeleteDriver={handleDeleteDriver} onAddVehicle={(v) => supabase.from('vehicles').insert([v]).then(fetchData)} onUpdateVehicle={handleUpdateVehicle} onDeleteVehicle={handleDeleteVehicle} onDeleteTrip={(id) => supabase.from('trips').delete().eq('id', id).then(fetchData)} onUpdateTrip={(t) => supabase.from('trips').update(t).eq('id', t.id).then(fetchData)} onUpdateFontSize={handleUpdateFontSize} />;
             default:
               return null;
           }

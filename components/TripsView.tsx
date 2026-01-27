@@ -3,22 +3,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Trip, Collaborator, Driver, Vehicle, Material } from '../types';
 import { 
   Plus, 
-  Camera, 
   MapPin, 
   IndianRupee, 
   ChevronLeft, 
   ChevronRight,
   Calendar as CalendarIcon,
-  UserPlus,
   Briefcase,
-  Share2,
   Trash2,
   Settings,
   Edit2,
   X,
   Filter,
   Search,
-  ArrowUpDown,
   TrendingUp,
   Check,
   Star
@@ -65,11 +61,9 @@ const TripsView: React.FC<TripsViewProps> = ({
   const [subTab, setSubTab] = useState<'general' | 'collaboration'>('collaboration');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showManageCollabs, setShowManageCollabs] = useState(false);
-  const [showManageMaterials, setShowManageMaterials] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedCollabId, setSelectedCollabId] = useState<string | null>(null);
   
-  // Search and Sort State
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -77,9 +71,6 @@ const TripsView: React.FC<TripsViewProps> = ({
   const [newCollabName, setNewCollabName] = useState('');
   const [editingCollabId, setEditingCollabId] = useState<string | null>(null);
   const [editingCollabName, setEditingCollabName] = useState('');
-  const [editingMatId, setEditingMatId] = useState<string | null>(null);
-  const [editingMatName, setEditingMatName] = useState('');
-  const [newMaterialName, setNewMaterialName] = useState('');
   
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -95,15 +86,14 @@ const TripsView: React.FC<TripsViewProps> = ({
     driver_id: drivers[0]?.id || '',
   });
 
-  // Pre-select default partner when switch to collaboration tab
+  // Ensure default partner is selected when switching to collaboration or on mount
   useEffect(() => {
-    if (subTab === 'collaboration' && !selectedCollabId && defaultCollaboratorId) {
-      // Only set if the default partner actually exists in collaborators list
-      if (collaborators.some(c => c.id === defaultCollaboratorId)) {
+    if (subTab === 'collaboration' && defaultCollaboratorId) {
+      if (!selectedCollabId) {
         setSelectedCollabId(defaultCollaboratorId);
       }
     }
-  }, [subTab, defaultCollaboratorId, collaborators, selectedCollabId]);
+  }, [subTab, defaultCollaboratorId, selectedCollabId]);
 
   useEffect(() => {
     if (subTab === 'collaboration') {
@@ -127,6 +117,13 @@ const TripsView: React.FC<TripsViewProps> = ({
     const now = new Date();
     tripDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
+    const activeCollabId = selectedCollabId || defaultCollaboratorId;
+
+    if (subTab === 'collaboration' && !activeCollabId) {
+      alert('Please select a partner first');
+      return;
+    }
+
     onAddTrip({
       vehicle_id: formData.vehicle_id,
       driver_id: formData.driver_id,
@@ -137,7 +134,7 @@ const TripsView: React.FC<TripsViewProps> = ({
       rate: Number(formData.rate),
       created_at: tripDate.toISOString(),
       contract_type: subTab,
-      collaborator_id: subTab === 'collaboration' ? selectedCollabId || undefined : undefined,
+      collaborator_id: subTab === 'collaboration' ? (activeCollabId || undefined) : undefined,
     });
     setShowAddForm(false);
     setFormData(prev => ({ ...prev, quantity: '', rate: '', site_name: '' }));
@@ -147,7 +144,7 @@ const TripsView: React.FC<TripsViewProps> = ({
     let result = trips.filter(trip => {
       const isDateMatch = isSameDay(parseISO(trip.created_at), selectedDate);
       const isTypeMatch = trip.contract_type === subTab;
-      const isCollabMatch = subTab === 'general' || (trip.collaborator_id === selectedCollabId);
+      const isCollabMatch = subTab === 'general' || (trip.collaborator_id === (selectedCollabId || defaultCollaboratorId));
       
       const searchMatch = !searchQuery || 
         trip.site_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -169,7 +166,7 @@ const TripsView: React.FC<TripsViewProps> = ({
     });
 
     return result;
-  }, [trips, selectedDate, subTab, selectedCollabId, searchQuery, sortKey, sortDirection]);
+  }, [trips, selectedDate, subTab, selectedCollabId, defaultCollaboratorId, searchQuery, sortKey, sortDirection]);
 
   const getCollabSummary = (collabId: string) => {
     const collabTrips = trips.filter(t => t.collaborator_id === collabId);
@@ -189,23 +186,11 @@ const TripsView: React.FC<TripsViewProps> = ({
     setEditingCollabId(null);
   };
 
-  const startEditMat = (mat: Material) => {
-    setEditingMatId(mat.id);
-    setEditingMatName(mat.name);
-  };
-
-  const saveEditMat = (id: string) => {
-    if (editingMatName.trim()) {
-      onUpdateMaterial(id, editingMatName);
-    }
-    setEditingMatId(null);
-  };
-
   const tripDates = useMemo(() => {
     return trips
-      .filter(t => t.contract_type === subTab && (subTab === 'general' || t.collaborator_id === selectedCollabId))
+      .filter(t => t.contract_type === subTab && (subTab === 'general' || t.collaborator_id === (selectedCollabId || defaultCollaboratorId)))
       .map(t => format(parseISO(t.created_at), 'yyyy-MM-dd'));
-  }, [trips, subTab, selectedCollabId]);
+  }, [trips, subTab, selectedCollabId, defaultCollaboratorId]);
 
   const renderCalendar = () => {
     const monthStart = startOfMonth(currentMonth);
@@ -279,7 +264,18 @@ const TripsView: React.FC<TripsViewProps> = ({
         <div className="flex gap-2">
           <button onClick={() => setShowCalendar(!showCalendar)} className={`p-3 rounded-xl border-2 transition-all ${showCalendar ? 'border-safety-yellow bg-safety-yellow/10' : 'border-zinc-800 bg-zinc-900'}`}><CalendarIcon size={20} className={showCalendar ? 'text-safety-yellow' : 'text-zinc-500'} /></button>
           {!showAddForm && (
-            <button onClick={() => { if (subTab === 'collaboration' && !selectedCollabId) { alert('Select a collaborator first'); return; } setShowAddForm(true); }} className="bg-safety-yellow text-zinc-950 p-3 rounded-xl shadow-xl active:scale-90"><Plus size={20} strokeWidth={4} /></button>
+            <button 
+              onClick={() => { 
+                if (subTab === 'collaboration' && !selectedCollabId && !defaultCollaboratorId) { 
+                  alert('Select a collaborator first'); 
+                  return; 
+                } 
+                setShowAddForm(true); 
+              }} 
+              className="bg-safety-yellow text-zinc-950 p-3 rounded-xl shadow-xl active:scale-90"
+            >
+              <Plus size={20} strokeWidth={4} />
+            </button>
           )}
         </div>
       </div>
@@ -292,15 +288,25 @@ const TripsView: React.FC<TripsViewProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
                 <h3 className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Active Partner</h3>
-                <button onClick={() => setShowManageCollabs(true)} className="bg-zinc-800 px-3 py-1.5 rounded-lg text-safety-yellow text-[10px] font-black uppercase flex items-center gap-1 border border-zinc-700 shadow-sm"><Settings size={12} /> Manage Partners</button>
+                <button onClick={() => setShowManageCollabs(true)} className="bg-zinc-800 px-3 py-1.5 rounded-lg text-safety-yellow text-[10px] font-black uppercase flex items-center gap-1 border border-zinc-700 shadow-sm"><Settings size={12} /> Partner Settings</button>
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {collaborators.map(c => (
-                  <button key={c.id} onClick={() => setSelectedCollabId(c.id)} className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${selectedCollabId === c.id ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
-                    {c.name}
-                    {defaultCollaboratorId === c.id && <Star size={10} className="absolute top-1 right-1 fill-zinc-950 text-zinc-950" />}
-                  </button>
-                ))}
+                {collaborators.map(c => {
+                  const isActive = (selectedCollabId || defaultCollaboratorId) === c.id;
+                  const isDefault = defaultCollaboratorId === c.id;
+                  return (
+                    <button 
+                      key={c.id} 
+                      onClick={() => setSelectedCollabId(c.id)} 
+                      className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${isActive ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'} ${isDefault && !isActive ? 'ring-1 ring-safety-yellow/30' : ''}`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {c.name}
+                        {isDefault && <Star size={10} className={`${isActive ? 'fill-zinc-950 text-zinc-950' : 'fill-safety-yellow text-safety-yellow'}`} />}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -370,6 +376,24 @@ const TripsView: React.FC<TripsViewProps> = ({
                 </select>
               </div>
             </div>
+            
+            {subTab === 'collaboration' && (
+              <div className="bg-zinc-900/50 p-4 rounded-2xl border-2 border-zinc-800/50 flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-zinc-500">Selected Partner</span>
+                  <span className="text-white font-black italic uppercase tracking-tight">
+                    {collaborators.find(c => c.id === (selectedCollabId || defaultCollaboratorId))?.name || 'None Selected'}
+                  </span>
+                </div>
+                {(selectedCollabId || defaultCollaboratorId) === defaultCollaboratorId && (
+                  <div className="px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-lg flex items-center gap-1.5">
+                    <Star size={10} className="fill-safety-yellow text-safety-yellow" />
+                    <span className="text-[8px] font-black text-safety-yellow uppercase">Default</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-zinc-500">Site Name</label>
               <input type="text" placeholder="Enter Site Name" value={formData.site_name} onChange={(e)=>setFormData({...formData, site_name: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 font-bold text-white" required />
@@ -401,7 +425,7 @@ const TripsView: React.FC<TripsViewProps> = ({
       {showManageCollabs && (
         <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Manage Partners</h2>
+            <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Partner Settings</h2>
             <button onClick={() => setShowManageCollabs(false)} className="text-zinc-500 bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
           </div>
           <div className="space-y-6">
@@ -421,7 +445,10 @@ const TripsView: React.FC<TripsViewProps> = ({
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2 flex-1">
                         <button 
-                          onClick={() => onSetDefaultCollaborator(isDefault ? null : c.id)}
+                          onClick={() => {
+                            onSetDefaultCollaborator(isDefault ? null : c.id);
+                            if (!isDefault) setSelectedCollabId(c.id); // Also highlight it immediately
+                          }}
                           className={`p-1.5 rounded-lg transition-all ${isDefault ? 'bg-safety-yellow/20 text-safety-yellow' : 'bg-zinc-800 text-zinc-600 hover:text-safety-yellow'}`}
                           title={isDefault ? "Unset default" : "Set as default"}
                         >
@@ -459,43 +486,6 @@ const TripsView: React.FC<TripsViewProps> = ({
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MANAGE MATERIALS OVERLAY */}
-      {showManageMaterials && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Manage Materials</h2>
-            <button onClick={() => setShowManageMaterials(false)} className="text-zinc-500 bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
-          </div>
-          <div className="space-y-6">
-            <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 shadow-xl space-y-4">
-              <p className="text-[10px] font-black uppercase text-zinc-500">Add Material</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Material Name" value={newMaterialName} onChange={e=>setNewMaterialName(e.target.value)} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold outline-none focus:border-safety-yellow" />
-                <button onClick={()=>{ if(newMaterialName.trim()){ onAddMaterial(newMaterialName); setNewMaterialName(''); } }} className="bg-safety-yellow text-zinc-950 px-6 rounded-xl font-black text-[10px] uppercase shadow-lg">Add</button>
-              </div>
-            </div>
-            <div className="space-y-3 pb-20">
-              {materials.map(m => (
-                <div key={m.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex justify-between items-center">
-                   {editingMatId === m.id ? (
-                    <div className="flex-1 flex gap-2">
-                      <input autoFocus value={editingMatName} onChange={e=>setEditingMatName(e.target.value)} className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-white font-bold border border-safety-yellow outline-none" />
-                      <button onClick={() => saveEditMat(m.id)} className="p-2 bg-emerald-500 text-zinc-950 rounded-lg"><Check size={16}/></button>
-                    </div>
-                  ) : (
-                    <p className="font-bold text-white text-lg italic">{m.name}</p>
-                  )}
-                  <div className="flex gap-2 ml-2">
-                    {!editingMatId && <button onClick={()=>startEditMat(m)} className="p-2 text-zinc-500 hover:text-safety-yellow"><Edit2 size={16}/></button>}
-                    <button onClick={()=>onDeleteMaterial(m.id)} className="p-2 text-red-500/60 hover:text-red-500"><Trash2 size={16}/></button>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>
