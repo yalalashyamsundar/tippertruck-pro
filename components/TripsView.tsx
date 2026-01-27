@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Trip, Collaborator, Driver, Vehicle, Material } from '../types';
+import { Trip, Collaborator, Driver, Vehicle, Material, Unit } from '../types';
 import { 
   Plus, 
   MapPin, 
@@ -18,7 +18,8 @@ import {
   TrendingUp,
   Check,
   Star,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react';
 import { 
   format, 
@@ -40,6 +41,8 @@ interface TripsViewProps {
   drivers: Driver[];
   vehicles: Vehicle[];
   materials: Material[];
+  units: Unit[];
+  onAddUnit: (name: string) => void;
   defaultCollaboratorId: string | null;
   onSetDefaultCollaborator: (id: string | null) => void;
   onAddTrip: (trip: Omit<Trip, 'id' | 'created_at'> & { created_at?: string }) => void;
@@ -55,7 +58,7 @@ type SortKey = 'date' | 'material' | 'site';
 type SortDirection = 'asc' | 'desc';
 
 const TripsView: React.FC<TripsViewProps> = ({ 
-  trips, collaborators, drivers, vehicles, materials, 
+  trips, collaborators, drivers, vehicles, materials, units, onAddUnit,
   defaultCollaboratorId, onSetDefaultCollaborator,
   onAddTrip, onAddCollaborator, onUpdateCollaborator, onDeleteCollaborator, onAddMaterial, onDeleteMaterial, onUpdateMaterial 
 }) => {
@@ -63,8 +66,14 @@ const TripsView: React.FC<TripsViewProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showManageCollabs, setShowManageCollabs] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedCollabId, setSelectedCollabId] = useState<string | null>(null);
+  
+  // Track selected partner and whether it was a manual user action
+  const [selectedCollabId, setSelectedCollabId] = useState<string | null>(defaultCollaboratorId);
+  const [isManualSelection, setIsManualSelection] = useState(false);
+
   const [isLocating, setIsLocating] = useState(false);
+  const [showAddUnitInput, setShowAddUnitInput] = useState(false);
+  const [newUnitName, setNewUnitName] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -81,21 +90,27 @@ const TripsView: React.FC<TripsViewProps> = ({
     site_name: '',
     material_type: '',
     quantity: '',
-    unit: 'trips' as any,
+    unit: '',
     rate: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     vehicle_id: vehicles[0]?.id || '',
     driver_id: drivers[0]?.id || '',
   });
 
-  // Ensure default partner is selected when switching to collaboration or on mount
+  // Automatically follow the default partner if the user hasn't made a manual choice
   useEffect(() => {
-    if (subTab === 'collaboration' && defaultCollaboratorId) {
-      if (!selectedCollabId) {
-        setSelectedCollabId(defaultCollaboratorId);
-      }
+    if (!isManualSelection) {
+      setSelectedCollabId(defaultCollaboratorId);
     }
-  }, [subTab, defaultCollaboratorId, selectedCollabId]);
+  }, [defaultCollaboratorId, isManualSelection]);
+
+  // If the default partner is unset globally, clear any selection and reset manual flag
+  useEffect(() => {
+    if (!defaultCollaboratorId) {
+      setSelectedCollabId(null);
+      setIsManualSelection(false);
+    }
+  }, [defaultCollaboratorId]);
 
   useEffect(() => {
     if (subTab === 'collaboration') {
@@ -138,15 +153,22 @@ const TripsView: React.FC<TripsViewProps> = ({
     );
   };
 
+  const handleAddCustomUnit = () => {
+    if (newUnitName.trim()) {
+      onAddUnit(newUnitName.trim());
+      setFormData(prev => ({ ...prev, unit: newUnitName.trim() }));
+      setNewUnitName('');
+      setShowAddUnitInput(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const tripDate = parseISO(formData.date);
     const now = new Date();
     tripDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
-    const activeCollabId = selectedCollabId || defaultCollaboratorId;
-
-    if (subTab === 'collaboration' && !activeCollabId) {
+    if (subTab === 'collaboration' && !selectedCollabId) {
       alert('Please select a partner first');
       return;
     }
@@ -158,10 +180,10 @@ const TripsView: React.FC<TripsViewProps> = ({
       material_type: formData.material_type,
       quantity: Number(formData.quantity),
       unit: formData.unit,
-      rate: Number(formData.rate),
+      rate: formData.rate ? Number(formData.rate) : 0,
       created_at: tripDate.toISOString(),
       contract_type: subTab,
-      collaborator_id: subTab === 'collaboration' ? (activeCollabId || undefined) : undefined,
+      collaborator_id: subTab === 'collaboration' ? (selectedCollabId || undefined) : undefined,
     });
     setShowAddForm(false);
     setFormData(prev => ({ ...prev, quantity: '', rate: '', site_name: '' }));
@@ -171,7 +193,7 @@ const TripsView: React.FC<TripsViewProps> = ({
     let result = trips.filter(trip => {
       const isDateMatch = isSameDay(parseISO(trip.created_at), selectedDate);
       const isTypeMatch = trip.contract_type === subTab;
-      const isCollabMatch = subTab === 'general' || (trip.collaborator_id === (selectedCollabId || defaultCollaboratorId));
+      const isCollabMatch = subTab === 'general' || (trip.collaborator_id === selectedCollabId);
       
       const searchMatch = !searchQuery || 
         trip.site_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -193,7 +215,7 @@ const TripsView: React.FC<TripsViewProps> = ({
     });
 
     return result;
-  }, [trips, selectedDate, subTab, selectedCollabId, defaultCollaboratorId, searchQuery, sortKey, sortDirection]);
+  }, [trips, selectedDate, subTab, selectedCollabId, searchQuery, sortKey, sortDirection]);
 
   const getCollabSummary = (collabId: string) => {
     const collabTrips = trips.filter(t => t.collaborator_id === collabId);
@@ -215,9 +237,9 @@ const TripsView: React.FC<TripsViewProps> = ({
 
   const tripDates = useMemo(() => {
     return trips
-      .filter(t => t.contract_type === subTab && (subTab === 'general' || t.collaborator_id === (selectedCollabId || defaultCollaboratorId)))
+      .filter(t => t.contract_type === subTab && (subTab === 'general' || t.collaborator_id === selectedCollabId))
       .map(t => format(parseISO(t.created_at), 'yyyy-MM-dd'));
-  }, [trips, subTab, selectedCollabId, defaultCollaboratorId]);
+  }, [trips, subTab, selectedCollabId]);
 
   const renderCalendar = () => {
     const monthStart = startOfMonth(currentMonth);
@@ -293,7 +315,7 @@ const TripsView: React.FC<TripsViewProps> = ({
           {!showAddForm && (
             <button 
               onClick={() => { 
-                if (subTab === 'collaboration' && !selectedCollabId && !defaultCollaboratorId) { 
+                if (subTab === 'collaboration' && !selectedCollabId) { 
                   alert('Select a collaborator first'); 
                   return; 
                 } 
@@ -319,12 +341,15 @@ const TripsView: React.FC<TripsViewProps> = ({
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                 {collaborators.map(c => {
-                  const isActive = (selectedCollabId || defaultCollaboratorId) === c.id;
+                  const isActive = selectedCollabId === c.id;
                   const isDefault = defaultCollaboratorId === c.id;
                   return (
                     <button 
                       key={c.id} 
-                      onClick={() => setSelectedCollabId(c.id)} 
+                      onClick={() => {
+                        setSelectedCollabId(c.id);
+                        setIsManualSelection(true); // User made an explicit choice
+                      }} 
                       className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${isActive ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'} ${isDefault && !isActive ? 'ring-1 ring-safety-yellow/30' : ''}`}
                     >
                       <span className="flex items-center gap-1.5">
@@ -409,10 +434,10 @@ const TripsView: React.FC<TripsViewProps> = ({
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase text-zinc-500">Selected Partner</span>
                   <span className="text-white font-black italic uppercase tracking-tight">
-                    {collaborators.find(c => c.id === (selectedCollabId || defaultCollaboratorId))?.name || 'None Selected'}
+                    {collaborators.find(c => c.id === selectedCollabId)?.name || 'None Selected'}
                   </span>
                 </div>
-                {(selectedCollabId || defaultCollaboratorId) === defaultCollaboratorId && (
+                {selectedCollabId === defaultCollaboratorId && (
                   <div className="px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-lg flex items-center gap-1.5">
                     <Star size={10} className="fill-safety-yellow text-safety-yellow" />
                     <span className="text-[8px] font-black text-safety-yellow uppercase">Default</span>
@@ -443,22 +468,82 @@ const TripsView: React.FC<TripsViewProps> = ({
                 </button>
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-zinc-500">Material</label>
-              <div className="flex flex-wrap gap-2">
-                {materials.map(m => (
-                  <button key={m.id} type="button" onClick={()=>setFormData({...formData, material_type: m.name})} className={`px-4 py-3 rounded-2xl border-2 text-[10px] font-black uppercase ${formData.material_type === m.name ? 'border-safety-yellow bg-safety-yellow/10 text-safety-yellow shadow-lg' : 'border-zinc-800 bg-zinc-900 text-zinc-500'}`}>{m.name}</button>
-                ))}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1"><Layers size={10} /> Material</label>
+                <select 
+                  value={formData.material_type} 
+                  onChange={(e)=>setFormData({...formData, material_type: e.target.value})} 
+                  className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow appearance-none"
+                >
+                  {materials.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-zinc-500">Units</label>
+                <div className="relative">
+                  {showAddUnitInput ? (
+                    <div className="flex gap-1 animate-in slide-in-from-right-2 duration-200">
+                      <input 
+                        type="text" 
+                        placeholder="New Unit"
+                        value={newUnitName}
+                        onChange={(e)=>setNewUnitName(e.target.value)}
+                        className="w-full bg-zinc-900 border-2 border-safety-yellow rounded-2xl p-4 text-sm font-bold text-white outline-none"
+                        autoFocus
+                      />
+                      <button 
+                        type="button"
+                        onClick={handleAddCustomUnit}
+                        className="bg-safety-yellow text-zinc-950 p-4 rounded-2xl shadow-lg"
+                      >
+                        <Check size={18} strokeWidth={3} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-1 items-center">
+                      <div className="relative flex-1">
+                        <select 
+                          value={formData.unit} 
+                          onChange={(e)=>setFormData({...formData, unit: e.target.value})} 
+                          className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow outline-none appearance-none"
+                        >
+                          {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                        </select>
+                        <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 rotate-90 pointer-events-none" />
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowAddUnitInput(true)}
+                        className="p-4 bg-zinc-800 border-2 border-zinc-800 rounded-2xl text-safety-yellow active:scale-90 transition-all shadow-md"
+                        title="Add Custom Unit"
+                      >
+                        <Plus size={18} strokeWidth={3} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-zinc-500">Quantity</label>
-                <input type="number" step="0.1" value={formData.quantity} onChange={(e)=>setFormData({...formData, quantity: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white" required />
+                <input type="number" step="0.1" value={formData.quantity} onChange={(e)=>setFormData({...formData, quantity: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white outline-none focus:border-safety-yellow" required />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Rate (₹)</label>
-                <input type="number" value={formData.rate} onChange={(e)=>setFormData({...formData, rate: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white" required />
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black uppercase text-zinc-500">Rate (₹)</label>
+                  <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest italic">Optional</span>
+                </div>
+                <input 
+                  type="number" 
+                  value={formData.rate} 
+                  onChange={(e)=>setFormData({...formData, rate: e.target.value})} 
+                  placeholder="0.00"
+                  className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white outline-none focus:border-emerald-500/50" 
+                />
               </div>
             </div>
             <button type="submit" className="w-full bg-safety-yellow text-zinc-950 py-6 rounded-2xl font-black text-xl uppercase tracking-widest shadow-2xl active:scale-95 transition-transform">Confirm Entry</button>
@@ -468,10 +553,10 @@ const TripsView: React.FC<TripsViewProps> = ({
 
       {/* MANAGE PARTNERS OVERLAY */}
       {showManageCollabs && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Partner Settings</h2>
-            <button onClick={() => setShowManageCollabs(false)} className="text-zinc-500 bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
+            <button onClick={() => setShowManageCollabs(false)} className="bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
           </div>
           <div className="space-y-6">
             <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 shadow-xl space-y-4">
@@ -491,8 +576,17 @@ const TripsView: React.FC<TripsViewProps> = ({
                       <div className="flex items-center gap-2 flex-1">
                         <button 
                           onClick={() => {
-                            onSetDefaultCollaborator(isDefault ? null : c.id);
-                            if (!isDefault) setSelectedCollabId(c.id); // Also highlight it immediately
+                            const newDefaultId = isDefault ? null : c.id;
+                            onSetDefaultCollaborator(newDefaultId);
+                            
+                            // Immediately sync selection with the default change
+                            if (newDefaultId) {
+                              setSelectedCollabId(newDefaultId);
+                              setIsManualSelection(false); // Follow the new default
+                            } else {
+                              setSelectedCollabId(null);
+                              setIsManualSelection(false); // No default to follow
+                            }
                           }}
                           className={`p-1.5 rounded-lg transition-all ${isDefault ? 'bg-safety-yellow/20 text-safety-yellow' : 'bg-zinc-800 text-zinc-600 hover:text-safety-yellow'}`}
                           title={isDefault ? "Unset default" : "Set as default"}
@@ -501,7 +595,7 @@ const TripsView: React.FC<TripsViewProps> = ({
                         </button>
                         {editingCollabId === c.id ? (
                           <div className="flex-1 flex gap-2">
-                            <input autoFocus value={editingCollabName} onChange={e=>setEditingCollabName(e.target.value)} className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-white font-bold border border-safety-yellow outline-none" />
+                            <input autoFocus value={editingCollabName} onChange={e=>setEditingCollabName(e.target.value)} className="flex-1 bg-zinc-800 rounded px-3 py-2 text-white font-bold border border-safety-yellow outline-none" />
                             <button onClick={() => saveEditCollab(c.id)} className="p-2 bg-emerald-500 text-zinc-950 rounded-lg"><Check size={16}/></button>
                           </div>
                         ) : (

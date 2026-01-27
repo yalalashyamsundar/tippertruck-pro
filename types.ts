@@ -18,6 +18,11 @@ export type Material = {
   name: string;
 };
 
+export type Unit = {
+  id: string;
+  name: string;
+};
+
 export type Collaborator = {
   id: string;
   name: string;
@@ -31,7 +36,7 @@ export type Trip = {
   site_name: string;
   material_type: string;
   quantity: number;
-  unit: 'Tons' | 'CFT' | 'trips';
+  unit: string;
   rate: number;
   image_url?: string;
   created_at: string;
@@ -88,6 +93,7 @@ export type AppState = {
   drivers: Driver[];
   vehicles: Vehicle[];
   materials: Material[];
+  units: Unit[];
   fuelLogs: FuelLog[];
   expenses: Expense[];
   maintenance: MaintenanceLog[];

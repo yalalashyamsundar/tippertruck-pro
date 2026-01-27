@@ -6,7 +6,7 @@ import TripsView from './components/TripsView';
 import ExpensesView from './components/ExpensesView';
 import MaintenanceView from './components/MaintenanceView';
 import AdminView from './components/AdminView';
-import { AppState, Trip, FuelLog, TyreStatus, Tyre, Collaborator, Driver, Vehicle, Material, Expense, MaintenanceLog } from './types';
+import { AppState, Trip, FuelLog, TyreStatus, Tyre, Collaborator, Driver, Vehicle, Material, Expense, MaintenanceLog, Unit } from './types';
 import { supabase } from './services/supabaseClient';
 import { Loader2, RefreshCw } from 'lucide-react';
 
@@ -23,6 +23,12 @@ const INITIAL_MATERIALS: Material[] = [
   { id: '5', name: 'Top Soil' },
 ];
 
+const INITIAL_UNITS: Unit[] = [
+  { id: '1', name: 'Tons' },
+  { id: '2', name: 'CFT' },
+  { id: '3', name: 'trips' },
+];
+
 const DEFAULT_STATE: AppState = {
   activeTab: 'dashboard',
   trips: [],
@@ -34,6 +40,7 @@ const DEFAULT_STATE: AppState = {
     { id: 'v1', reg_number: 'MH04-HY-9921', current_odometer: 125400 }
   ],
   materials: INITIAL_MATERIALS,
+  units: INITIAL_UNITS,
   fuelLogs: [],
   expenses: [],
   maintenance: [],
@@ -72,6 +79,7 @@ const App: React.FC = () => {
         drivers,
         vehicles,
         materials,
+        units,
         fuelLogs,
         expenses,
         tyres,
@@ -83,6 +91,7 @@ const App: React.FC = () => {
         safeFetch(supabase.from('drivers').select('*')),
         safeFetch(supabase.from('vehicles').select('*')),
         safeFetch(supabase.from('materials').select('*')),
+        safeFetch(supabase.from('units').select('*')),
         safeFetch(supabase.from('fuel_logs').select('*').order('created_at', { ascending: false })),
         safeFetch(supabase.from('expenses').select('*').order('created_at', { ascending: false })),
         safeFetch(supabase.from('tyres').select('*').order('id', { ascending: true })),
@@ -97,6 +106,7 @@ const App: React.FC = () => {
         drivers: drivers && drivers.length > 0 ? drivers : prev.drivers,
         vehicles: vehicles && vehicles.length > 0 ? vehicles : prev.vehicles,
         materials: materials && materials.length > 0 ? materials : prev.materials,
+        units: units && units.length > 0 ? units : prev.units,
         fuelLogs: fuelLogs || [],
         expenses: expenses || [],
         maintenance: maintenance || [],
@@ -180,6 +190,19 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, defaultCollaboratorId: id }));
   };
 
+  const handleAddUnit = async (name: string) => {
+    const { error } = await supabase.from('units').insert([{ name }]);
+    if (error) {
+      // If table doesn't exist, just update local state
+      setState(prev => ({
+        ...prev,
+        units: [...prev.units, { id: Date.now().toString(), name }]
+      }));
+    } else {
+      fetchData();
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-6 p-6">
@@ -206,7 +229,6 @@ const App: React.FC = () => {
           const activeVehicle = state.vehicles.find(v => v.id === state.activeVehicleId) || state.vehicles[0];
           switch (state.activeTab) {
             case 'dashboard':
-              // FIX: Added missing 'vehicles' prop and matched 'onQuickAction' signature
               return (
                 <Dashboard 
                   trips={state.trips} 
@@ -220,7 +242,7 @@ const App: React.FC = () => {
                 />
               );
             case 'trips':
-              return <TripsView trips={state.trips} collaborators={state.collaborators} drivers={state.drivers} vehicles={state.vehicles} materials={state.materials} defaultCollaboratorId={state.defaultCollaboratorId} onSetDefaultCollaborator={handleSetDefaultCollaborator} onAddTrip={handleAddTrip} onAddCollaborator={(name) => supabase.from('collaborators').insert([{name}]).then(fetchData)} onUpdateCollaborator={(id, name) => supabase.from('collaborators').update({name}).eq('id', id).then(fetchData)} onDeleteCollaborator={(id) => supabase.from('collaborators').delete().eq('id', id).then(fetchData)} onAddMaterial={(name) => supabase.from('materials').insert([{name}]).then(fetchData)} onDeleteMaterial={(id) => supabase.from('materials').delete().eq('id', id).then(fetchData)} onUpdateMaterial={(id, name) => supabase.from('materials').update({name}).eq('id', id).then(fetchData)} />;
+              return <TripsView trips={state.trips} collaborators={state.collaborators} drivers={state.drivers} vehicles={state.vehicles} materials={state.materials} units={state.units} onAddUnit={handleAddUnit} defaultCollaboratorId={state.defaultCollaboratorId} onSetDefaultCollaborator={handleSetDefaultCollaborator} onAddTrip={handleAddTrip} onAddCollaborator={(name) => supabase.from('collaborators').insert([{name}]).then(fetchData)} onUpdateCollaborator={(id, name) => supabase.from('collaborators').update({name}).eq('id', id).then(fetchData)} onDeleteCollaborator={(id) => supabase.from('collaborators').delete().eq('id', id).then(fetchData)} onAddMaterial={(name) => supabase.from('materials').insert([{name}]).then(fetchData)} onDeleteMaterial={(id) => supabase.from('materials').delete().eq('id', id).then(fetchData)} onUpdateMaterial={(id, name) => supabase.from('materials').update({name}).eq('id', id).then(fetchData)} />;
             case 'expenses':
               return <ExpensesView fuelLogs={state.fuelLogs} onAddFuel={handleAddFuel} vehicles={state.vehicles} />;
             case 'maintenance':

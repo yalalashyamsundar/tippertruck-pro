@@ -208,7 +208,7 @@ const AdminView: React.FC<AdminViewProps> = ({
 
       {/* MANAGE DRIVERS OVERLAY */}
       {showManageDrivers && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Manage Drivers</h2>
             <button onClick={() => setShowManageDrivers(false)} className="bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
@@ -255,7 +255,7 @@ const AdminView: React.FC<AdminViewProps> = ({
 
       {/* MANAGE VEHICLES OVERLAY */}
       {showManageVehicles && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Manage Fleet</h2>
             <button onClick={() => setShowManageVehicles(false)} className="bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
@@ -299,7 +299,7 @@ const AdminView: React.FC<AdminViewProps> = ({
 
       {/* MANAGE TRIPS OVERLAY */}
       {showManageTrips && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Manage Trips</h2>
             <button onClick={() => setShowManageTrips(false)} className="bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>

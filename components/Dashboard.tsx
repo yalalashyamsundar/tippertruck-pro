@@ -290,7 +290,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* PDF Preview Modal */}
       {pdfUrl && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] bg-zinc-950/80 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-zinc-900 rounded-[2rem] border border-zinc-800 shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
             <div className="flex justify-between items-center p-6 border-b border-zinc-800">
               <div className="flex items-center gap-3">

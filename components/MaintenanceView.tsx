@@ -35,7 +35,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-black italic uppercase italic tracking-tighter">Settings</h2>
+        <h2 className="text-3xl font-black italic uppercase tracking-tighter">Settings</h2>
         <button 
           onClick={() => setShowManageVehicles(true)} 
           className="bg-zinc-800 p-3 rounded-2xl border border-zinc-700 text-safety-yellow shadow-xl active:scale-95"
@@ -120,7 +120,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({
 
       {/* MANAGE VEHICLES OVERLAY */}
       {showManageVehicles && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/98 p-6 overflow-y-auto animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
             <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Manage Fleet</h2>
             <button onClick={() => setShowManageVehicles(false)} className="bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
