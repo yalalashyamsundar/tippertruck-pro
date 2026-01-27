@@ -7,41 +7,40 @@
     <title>Tipperlog Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Shim process.env to prevent crashes in browser environments
+      // Shim process.env and identify errors immediately
       window.process = window.process || { env: {} };
+      
+      // Global Error Handler to catch "Blank Screen" culprits
+      window.onerror = function(msg, url, line, col, error) {
+        const root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = `
+            <div style="padding: 20px; background: #1a1a1a; color: #ff4444; font-family: monospace; height: 100vh;">
+              <h1 style="color: #FFD700;">⚠️ Application Crash</h1>
+              <p><strong>Error:</strong> ${msg}</p>
+              <p><strong>Location:</strong> ${url}:${line}:${col}</p>
+              <button onclick="location.reload()" style="background: #FFD700; color: black; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; margin-top: 20px;">Reload App</button>
+            </div>
+          `;
+        }
+        return false;
+      };
     </script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Courier+Prime&display=swap');
-
       body {
         background-color: #121212;
         color: #f4f4f5;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         -webkit-tap-highlight-color: transparent;
       }
-      
-      .font-typewriter {
-        font-family: 'Courier Prime', 'Courier New', Courier, monospace;
-      }
-
-      /* Custom high-contrast yellow */
       .bg-safety-yellow { background-color: #FFD700; }
       .text-safety-yellow { color: #FFD700; }
       .border-safety-yellow { border-color: #FFD700; }
-      
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-
-      .chart-bar {
-        transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
@@ -52,12 +51,12 @@
     "date-fns": "https://esm.sh/date-fns@4.1.0",
     "jspdf": "https://esm.sh/jspdf@2.5.1",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
   </body>
