@@ -170,18 +170,18 @@ const Dashboard: React.FC<DashboardProps> = ({
   const todayTrips = filteredTrips.filter(t => t.created_at.startsWith(todayStr));
   const todayFuelLogs = filteredFuel.filter(f => f.created_at.startsWith(todayStr));
   
-  const todayRevenue = todayTrips.reduce((acc, t) => acc + (t.quantity * t.rate), 0);
+  const todayRevenue = todayTrips.reduce((acc, t) => acc + (Number(t.quantity || 0) * Number(t.rate || 0)), 0);
   const todayTonnage = todayTrips
     .filter(t => t.unit === 'Tons')
-    .reduce((acc, t) => acc + t.quantity, 0);
+    .reduce((acc, t) => acc + Number(t.quantity || 0), 0);
   
-  const todayFuelValue = todayFuelLogs.reduce((acc, f) => acc + f.liters, 0);
+  const todayFuelValue = todayFuelLogs.reduce((acc, f) => acc + Number(f.liters || 0), 0);
 
   const chartData = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
       const date = subDays(new Date(), 6 - i);
       const dayTrips = filteredTrips.filter(t => isSameDay(parseISO(t.created_at), date));
-      const dayRevenue = dayTrips.reduce((acc, t) => acc + (t.quantity * t.rate), 0);
+      const dayRevenue = dayTrips.reduce((acc, t) => acc + (Number(t.quantity || 0) * Number(t.rate || 0)), 0);
       return {
         label: format(date, 'EEE'),
         trips: dayTrips.length,
@@ -227,9 +227,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     const data = [
       ["Metric", "Value"],
       ["Total Trips", todayTrips.length.toString()],
-      ["Tonnage Moved", `${todayTonnage.toFixed(1)} T`],
-      ["Revenue", `INR ${todayRevenue.toLocaleString()}`],
-      ["Fuel Logged", `${todayFuelValue.toFixed(1)} L`],
+      ["Tonnage Moved", `${(todayTonnage || 0).toFixed(1)} T`],
+      ["Revenue", `INR ${(todayRevenue || 0).toLocaleString()}`],
+      ["Fuel Logged", `${(todayFuelValue || 0).toFixed(1)} L`],
     ];
 
     doc.setFontSize(11);
@@ -321,7 +321,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1">
                         <Clock size={10} /> {format(parseISO(trip.created_at), 'hh:mm a')}
                       </span>
-                      <span className="text-safety-yellow font-black text-lg italic uppercase">{trip.quantity} {trip.unit}</span>
+                      <span className="text-safety-yellow font-black text-lg italic uppercase">{trip.quantity || 0} {trip.unit}</span>
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
@@ -330,7 +330,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <MapPin size={8} /> {trip.site_name}
                         </p>
                       </div>
-                      <span className="text-emerald-500 font-black text-xs">₹{(trip.quantity * trip.rate).toLocaleString()}</span>
+                      <span className="text-emerald-500 font-black text-xs">₹{(Number(trip.quantity || 0) * Number(trip.rate || 0)).toLocaleString()}</span>
                     </div>
                   </div>
                 ))
@@ -362,16 +362,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1">
                         <Clock size={10} /> {format(parseISO(log.created_at), 'hh:mm a')}
                       </span>
-                      <span className="text-emerald-500 font-black text-lg italic uppercase">{log.liters} L</span>
+                      <span className="text-emerald-500 font-black text-lg italic uppercase">{log.liters || 0} L</span>
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
                         <h4 className="text-white font-black text-sm uppercase italic leading-none">{log.station_name}</h4>
                         <p className="text-zinc-500 text-[9px] font-bold uppercase mt-1 flex items-center gap-1">
-                          <Droplets size={8} /> ODO: {log.odometer} KM
+                          <Droplets size={8} /> ODO: {log.odometer || 0} KM
                         </p>
                       </div>
-                      <span className="text-emerald-400 font-black text-xs">₹{log.cost.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-black text-xs">₹{(log.cost || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 ))
@@ -428,7 +428,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         />
         <StatCard 
           title="Tonnage Moved"
-          value={`${todayTonnage.toFixed(1)} T`}
+          value={`${(todayTonnage || 0).toFixed(1)} T`}
           icon={<Truck size={16} />}
           iconColorClass="text-blue-400"
           valueColorClass="text-white"
@@ -437,7 +437,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         />
         <StatCard 
           title="Revenue"
-          value={`₹${todayRevenue.toLocaleString()}`}
+          value={`₹${(todayRevenue || 0).toLocaleString()}`}
           icon={<IndianRupee size={16} />}
           iconColorClass="text-emerald-500"
           valueColorClass="text-emerald-500"
@@ -446,7 +446,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         />
         <StatCard 
           title="Fuel Logged"
-          value={`${todayFuelValue.toFixed(1)} L`}
+          value={`${(todayFuelValue || 0).toFixed(1)} L`}
           icon={<Fuel size={16} />}
           iconColorClass="text-zinc-500"
           valueColorClass="text-white"

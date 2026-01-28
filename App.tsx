@@ -51,16 +51,16 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const safeFetch = async (query: any) => {
+  const safeFetch = async (query: any, silent: boolean = false) => {
     try {
       const { data, error } = await query;
       if (error) {
-        console.warn("Table fetch warning:", error.message);
+        if (!silent) console.warn("Table fetch warning:", error.message);
         return null;
       }
       return data;
     } catch (e) {
-      console.error("Table fetch crash:", e);
+      if (!silent) console.error("Table fetch crash:", e);
       return null;
     }
   };
@@ -87,7 +87,7 @@ const App: React.FC = () => {
         safeFetch(supabase.from('drivers').select('*')),
         safeFetch(supabase.from('vehicles').select('*')),
         safeFetch(supabase.from('materials').select('*')),
-        safeFetch(supabase.from('units').select('*')),
+        safeFetch(supabase.from('units').select('*'), true), // Silent fetch for units table
         safeFetch(supabase.from('fuel_logs').select('*').order('created_at', { ascending: false })),
         safeFetch(supabase.from('expenses').select('*').order('created_at', { ascending: false })),
         safeFetch(supabase.from('tyres').select('*').order('id', { ascending: true })),
@@ -122,12 +122,14 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchData();
 
+    // Setup channel subscriptions. We use a more generic approach to handle potential missing tables
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_logs' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborators' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, () => fetchData()) // Added units sync
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchData())
       .subscribe();
 
@@ -142,13 +144,11 @@ const App: React.FC = () => {
 
   // Handlers
   const handleAddTrip = async (trip: any) => {
-    // Validate IDs are actual UUIDs and not empty strings
     if (!trip.vehicle_id || !trip.driver_id) {
       alert("Registration Required: Please add a Truck and a Driver in Admin Panel first.");
       return;
     }
 
-    // Optimistic Update
     const tempId = 'temp-' + Date.now();
     const tempTrip = { ...trip, id: tempId };
     setState(prev => ({ ...prev, trips: [tempTrip, ...prev.trips] }));
@@ -213,14 +213,23 @@ const App: React.FC = () => {
   };
 
   const handleAddUnit = async (name: string) => {
-    const { error } = await supabase.from('units').insert([{ name }]);
-    if (error) {
-      setState(prev => ({
-        ...prev,
-        units: [...prev.units, { id: Date.now().toString(), name }]
-      }));
-    } else {
-      fetchData();
+    // Optimistically add to local state immediately
+    const localUnit = { id: Date.now().toString(), name };
+    setState(prev => ({
+      ...prev,
+      units: [...prev.units, localUnit]
+    }));
+
+    try {
+      const { error } = await supabase.from('units').insert([{ name }]);
+      if (error) {
+        // We already added it locally, just log the warning
+        console.warn("Unit sync to DB failed (possibly missing table), staying local-only.");
+      } else {
+        fetchData(); // Sync with actual DB data if successful
+      }
+    } catch (e) {
+      console.warn("Unit sync failed, staying local-only.");
     }
   };
 

@@ -42,7 +42,7 @@ const AdminView: React.FC<AdminViewProps> = ({
 
   const runDiagnostics = async () => {
     setIsRunningDiag(true);
-    const tables = ['trips', 'vehicles', 'drivers', 'materials', 'collaborators', 'fuel_logs', 'expenses', 'tyres', 'app_settings'];
+    const tables = ['trips', 'vehicles', 'drivers', 'materials', 'units', 'collaborators', 'fuel_logs', 'expenses', 'tyres', 'app_settings'];
     const results = [];
 
     for (const table of tables) {
@@ -166,7 +166,7 @@ const AdminView: React.FC<AdminViewProps> = ({
                     ) : (
                       <div className="flex items-center gap-1.5 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
                          <AlertCircle size={10} className="text-red-500" />
-                         <span className="text-[8px] font-black text-red-500 uppercase">Missing Table</span>
+                         <span className="text-[8px] font-black text-red-500 uppercase">{res.error?.includes('schema cache') ? 'Missing Table' : 'Error'}</span>
                       </div>
                     )}
                   </div>

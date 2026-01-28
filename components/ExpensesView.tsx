@@ -21,7 +21,7 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ fuelLogs, vehicles, onAddFu
   });
 
   const lastFuel = fuelLogs[0];
-  const avgMileage = fuelLogs.reduce((acc, log) => acc + log.calculated_mileage, 0) / (fuelLogs.length || 1);
+  const avgMileage = fuelLogs.reduce((acc, log) => acc + (log.calculated_mileage || 0), 0) / (fuelLogs.length || 1);
 
   const handleFuelSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +52,7 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ fuelLogs, vehicles, onAddFu
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-zinc-900 p-4 rounded-2xl border-l-4 border-emerald-500 shadow-lg">
                   <div className="flex items-center gap-2 mb-2 text-zinc-400"><Droplets size={14} className="text-emerald-500" /><span className="text-[10px] font-black uppercase tracking-widest">Avg Efficiency</span></div>
-                  <p className="text-3xl font-black text-white">{avgMileage.toFixed(1)} <span className="text-xs text-zinc-500">KMPL</span></p>
+                  <p className="text-3xl font-black text-white">{(avgMileage || 0).toFixed(1)} <span className="text-xs text-zinc-500">KMPL</span></p>
                 </div>
                 <div className="bg-zinc-900 p-4 rounded-2xl border-l-4 border-blue-500 shadow-lg">
                   <div className="flex items-center gap-2 mb-2 text-zinc-400"><Info size={14} className="text-blue-500" /><span className="text-[10px] font-black uppercase tracking-widest">Recent Odo</span></div>
@@ -64,11 +64,11 @@ const ExpensesView: React.FC<ExpensesViewProps> = ({ fuelLogs, vehicles, onAddFu
                 {fuelLogs.map((log) => (
                   <div key={log.id} className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex justify-between items-center">
                     <div>
-                      <p className="font-black text-white text-lg">{log.liters}L <span className="text-zinc-500 text-xs">@ ₹{(log.cost/log.liters).toFixed(1)}</span></p>
+                      <p className="font-black text-white text-lg">{log.liters || 0}L <span className="text-zinc-500 text-xs">@ ₹{((log.cost || 0)/(log.liters || 1)).toFixed(1)}</span></p>
                       <p className="text-[10px] text-zinc-500 font-bold uppercase">{vehicles.find(v=>v.id===log.vehicle_id)?.reg_number} • {new Date(log.created_at).toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
-                      <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${log.calculated_mileage < 3.5 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{log.calculated_mileage.toFixed(1)} KMPL</div>
+                      <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${(log.calculated_mileage || 0) < 3.5 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{(log.calculated_mileage || 0).toFixed(1)} KMPL</div>
                     </div>
                   </div>
                 ))}
