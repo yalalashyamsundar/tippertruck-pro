@@ -2,11 +2,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Trip, FuelLog, Expense } from "../types";
 
-// Always use the direct process.env.API_KEY as per @google/genai guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const generateDailySummary = async (trips: Trip[], expenses: Expense[], fuelLogs: FuelLog[]) => {
-  // Use generateContent directly and await it for proper promise handling
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Analyze these daily records and provide a concise WhatsApp-friendly summary.
@@ -25,11 +22,11 @@ export const generateDailySummary = async (trips: Trip[], expenses: Expense[], f
     `,
   });
   
-  // Access .text property directly (not as a function) as per guidelines
   return response.text || "Summary unavailable.";
 };
 
 export const getNearbyFuelStations = async (lat: number, lng: number) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -46,7 +43,6 @@ export const getNearbyFuelStations = async (lat: number, lng: number) => {
         }
       },
     });
-    // Return both text and grounding chunks to satisfy requirement of displaying links on the web app
     return {
       text: response.text,
       groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks
