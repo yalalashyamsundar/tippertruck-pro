@@ -13,7 +13,10 @@ import {
   X,
   FileText,
   Download,
-  ChevronDown
+  ChevronDown,
+  Clock,
+  MapPin,
+  Droplets
 } from 'lucide-react';
 import { subDays, format, isSameDay, parseISO } from 'date-fns';
 import { jsPDF } from 'jspdf';
@@ -37,9 +40,14 @@ const StatCard: React.FC<{
   valueColorClass: string;
   borderColorClass: string;
   bgColorClass: string;
-}> = ({ title, value, icon, iconColorClass, valueColorClass, borderColorClass, bgColorClass }) => (
-  <div className={`p-4 rounded-3xl border ${borderColorClass} ${bgColorClass} shadow-md flex flex-col justify-between min-h-[90px] transition-all duration-300`}>
-    <div className="flex justify-between items-start">
+  onClick?: () => void;
+}> = ({ title, value, icon, iconColorClass, valueColorClass, borderColorClass, bgColorClass, onClick }) => (
+  <button 
+    onClick={onClick}
+    disabled={!onClick}
+    className={`p-4 rounded-3xl border ${borderColorClass} ${bgColorClass} shadow-md flex flex-col justify-between min-h-[90px] transition-all duration-300 text-left w-full ${onClick ? 'active:scale-95 cursor-pointer hover:border-zinc-700' : ''}`}
+  >
+    <div className="flex justify-between items-start w-full">
       <span className="text-zinc-500 text-[10px] font-black uppercase tracking-wider leading-tight max-w-[70px]">
         {title}
       </span>
@@ -50,7 +58,7 @@ const StatCard: React.FC<{
     <div className={`text-2xl font-black ${valueColorClass} tracking-tighter mt-2`}>
       {value}
     </div>
-  </div>
+  </button>
 );
 
 const AreaChart: React.FC<{ data: { label: string, trips: number, revenue: number }[] }> = ({ data }) => {
@@ -143,6 +151,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('all');
+  
+  const [showTripsModal, setShowTripsModal] = useState(false);
+  const [showFuelModal, setShowFuelModal] = useState(false);
 
   // Filter logic based on vehicle
   const filteredTrips = useMemo(() => {
@@ -157,15 +168,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayTrips = filteredTrips.filter(t => t.created_at.startsWith(todayStr));
+  const todayFuelLogs = filteredFuel.filter(f => f.created_at.startsWith(todayStr));
   
   const todayRevenue = todayTrips.reduce((acc, t) => acc + (t.quantity * t.rate), 0);
   const todayTonnage = todayTrips
     .filter(t => t.unit === 'Tons')
     .reduce((acc, t) => acc + t.quantity, 0);
   
-  const todayFuelValue = filteredFuel
-    .filter(f => f.created_at.startsWith(todayStr))
-    .reduce((acc, f) => acc + f.liters, 0);
+  const todayFuelValue = todayFuelLogs.reduce((acc, f) => acc + f.liters, 0);
 
   const chartData = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
@@ -288,6 +298,89 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* Detail Modals */}
+      {showTripsModal && (
+        <div className="fixed inset-0 z-[110] bg-zinc-950/80 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-zinc-900 rounded-[2rem] border border-zinc-800 shadow-2xl flex flex-col overflow-hidden max-h-[80vh]">
+            <div className="flex justify-between items-center p-6 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Route className="text-safety-yellow" size={24} />
+                <h3 className="font-black uppercase tracking-tighter text-white">Trips Detail (Today)</h3>
+              </div>
+              <button onClick={() => setShowTripsModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+              {todayTrips.length === 0 ? (
+                <p className="text-zinc-600 font-bold uppercase text-xs italic text-center py-10">No trips recorded today</p>
+              ) : (
+                todayTrips.map(trip => (
+                  <div key={trip.id} className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700/50 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1">
+                        <Clock size={10} /> {format(parseISO(trip.created_at), 'hh:mm a')}
+                      </span>
+                      <span className="text-safety-yellow font-black text-lg italic uppercase">{trip.quantity} {trip.unit}</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h4 className="text-white font-black text-sm uppercase italic leading-none">{trip.material_type}</h4>
+                        <p className="text-zinc-500 text-[9px] font-bold uppercase mt-1 flex items-center gap-1">
+                          <MapPin size={8} /> {trip.site_name}
+                        </p>
+                      </div>
+                      <span className="text-emerald-500 font-black text-xs">₹{(trip.quantity * trip.rate).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFuelModal && (
+        <div className="fixed inset-0 z-[110] bg-zinc-950/80 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-zinc-900 rounded-[2rem] border border-zinc-800 shadow-2xl flex flex-col overflow-hidden max-h-[80vh]">
+            <div className="flex justify-between items-center p-6 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Fuel className="text-emerald-500" size={24} />
+                <h3 className="font-black uppercase tracking-tighter text-white">Fuel Logs (Today)</h3>
+              </div>
+              <button onClick={() => setShowFuelModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+              {todayFuelLogs.length === 0 ? (
+                <p className="text-zinc-600 font-bold uppercase text-xs italic text-center py-10">No fuel records today</p>
+              ) : (
+                todayFuelLogs.map(log => (
+                  <div key={log.id} className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700/50 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1">
+                        <Clock size={10} /> {format(parseISO(log.created_at), 'hh:mm a')}
+                      </span>
+                      <span className="text-emerald-500 font-black text-lg italic uppercase">{log.liters} L</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h4 className="text-white font-black text-sm uppercase italic leading-none">{log.station_name}</h4>
+                        <p className="text-zinc-500 text-[9px] font-bold uppercase mt-1 flex items-center gap-1">
+                          <Droplets size={8} /> ODO: {log.odometer} KM
+                        </p>
+                      </div>
+                      <span className="text-emerald-400 font-black text-xs">₹{log.cost.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PDF Preview Modal */}
       {pdfUrl && (
         <div className="fixed inset-0 z-[100] bg-zinc-950/80 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
@@ -331,6 +424,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           valueColorClass="text-safety-yellow"
           borderColorClass="border-safety-yellow/20"
           bgColorClass="bg-zinc-900/40"
+          onClick={() => setShowTripsModal(true)}
         />
         <StatCard 
           title="Tonnage Moved"
@@ -358,6 +452,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           valueColorClass="text-white"
           borderColorClass="border-zinc-800"
           bgColorClass="bg-zinc-900/40"
+          onClick={() => setShowFuelModal(true)}
         />
       </div>
 
