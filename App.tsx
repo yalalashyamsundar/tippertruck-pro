@@ -33,19 +33,15 @@ const DEFAULT_STATE: AppState = {
   activeTab: 'dashboard',
   trips: [],
   collaborators: [],
-  drivers: [
-    { id: 'd1', name: 'Suresh Kumar', type: 'Permanent' }
-  ],
-  vehicles: [
-    { id: 'v1', reg_number: 'MH04-HY-9921', current_odometer: 125400 }
-  ],
+  drivers: [],
+  vehicles: [],
   materials: INITIAL_MATERIALS,
   units: INITIAL_UNITS,
   fuelLogs: [],
   expenses: [],
   maintenance: [],
   tyres: INITIAL_TYRES,
-  activeVehicleId: 'v1',
+  activeVehicleId: '',
   defaultCollaboratorId: null,
   fontSize: 16,
 };
@@ -103,15 +99,15 @@ const App: React.FC = () => {
         ...prev,
         trips: trips || [],
         collaborators: collaborators || [],
-        drivers: drivers && drivers.length > 0 ? drivers : prev.drivers,
-        vehicles: vehicles && vehicles.length > 0 ? vehicles : prev.vehicles,
-        materials: materials && materials.length > 0 ? materials : prev.materials,
-        units: units && units.length > 0 ? units : prev.units,
+        drivers: drivers || [],
+        vehicles: vehicles || [],
+        materials: (materials && materials.length > 0) ? materials : prev.materials,
+        units: (units && units.length > 0) ? units : prev.units,
         fuelLogs: fuelLogs || [],
         expenses: expenses || [],
         maintenance: maintenance || [],
-        tyres: tyres && tyres.length > 0 ? tyres : INITIAL_TYRES,
-        activeVehicleId: settings?.active_vehicle_id || prev.activeVehicleId,
+        tyres: (tyres && tyres.length > 0) ? tyres : INITIAL_TYRES,
+        activeVehicleId: settings?.active_vehicle_id || (vehicles?.[0]?.id || ''),
         defaultCollaboratorId: settings?.default_collaborator_id || null,
         fontSize: settings?.font_size || prev.fontSize,
       }));
@@ -146,11 +142,37 @@ const App: React.FC = () => {
 
   // Handlers
   const handleAddTrip = async (trip: any) => {
-    const { data, error } = await supabase.from('trips').insert([trip]).select();
-    if (!error && data) setState(prev => ({ ...prev, trips: [data[0], ...prev.trips] }));
+    // Validate IDs are actual UUIDs and not empty strings
+    if (!trip.vehicle_id || !trip.driver_id) {
+      alert("Registration Required: Please add a Truck and a Driver in Admin Panel first.");
+      return;
+    }
+
+    // Optimistic Update
+    const tempId = 'temp-' + Date.now();
+    const tempTrip = { ...trip, id: tempId };
+    setState(prev => ({ ...prev, trips: [tempTrip, ...prev.trips] }));
+
+    try {
+      const { data, error } = await supabase.from('trips').insert([trip]).select();
+      if (error) {
+        console.error("Trip creation failed in DB:", error.message);
+        setState(prev => ({ ...prev, trips: prev.trips.filter(t => t.id !== tempId) }));
+        alert("Trip not saved: " + error.message);
+      } else if (data) {
+        setState(prev => ({ 
+          ...prev, 
+          trips: prev.trips.map(t => t.id === tempId ? data[0] : t) 
+        }));
+      }
+    } catch (err) {
+      console.error("Network error during trip creation:", err);
+      setState(prev => ({ ...prev, trips: prev.trips.filter(t => t.id !== tempId) }));
+    }
   };
 
   const handleAddFuel = async (log: any) => {
+    if (!log.vehicle_id) return;
     const { data, error } = await supabase.from('fuel_logs').insert([log]).select();
     if (!error && data) fetchData();
   };
@@ -193,7 +215,6 @@ const App: React.FC = () => {
   const handleAddUnit = async (name: string) => {
     const { error } = await supabase.from('units').insert([{ name }]);
     if (error) {
-      // If table doesn't exist, just update local state
       setState(prev => ({
         ...prev,
         units: [...prev.units, { id: Date.now().toString(), name }]
@@ -209,7 +230,7 @@ const App: React.FC = () => {
         <Loader2 className="w-12 h-12 text-safety-yellow animate-spin" />
         <div className="text-center space-y-2">
           <p className="text-white font-black uppercase tracking-[0.2em] text-xs">TipperPro</p>
-          <p className="text-zinc-600 font-bold uppercase tracking-widest text-[8px]">Loading Environment...</p>
+          <p className="text-zinc-600 font-bold uppercase tracking-widest text-[8px]">Syncing Records...</p>
         </div>
       </div>
     );
@@ -221,7 +242,7 @@ const App: React.FC = () => {
         {isSyncing && (
           <div className="fixed top-20 right-4 z-50 flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full shadow-2xl">
              <RefreshCw size={10} className="text-safety-yellow animate-spin" />
-             <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Syncing</span>
+             <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Live Sync</span>
           </div>
         )}
         

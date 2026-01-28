@@ -19,7 +19,8 @@ import {
   Check,
   Star,
   Loader2,
-  Layers
+  Layers,
+  AlertCircle
 } from 'lucide-react';
 import { 
   format, 
@@ -67,7 +68,6 @@ const TripsView: React.FC<TripsViewProps> = ({
   const [showManageCollabs, setShowManageCollabs] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   
-  // Track selected partner and whether it was a manual user action
   const [selectedCollabId, setSelectedCollabId] = useState<string | null>(defaultCollaboratorId);
   const [isManualSelection, setIsManualSelection] = useState(false);
 
@@ -93,18 +93,33 @@ const TripsView: React.FC<TripsViewProps> = ({
     unit: '',
     rate: '',
     date: format(new Date(), 'yyyy-MM-dd'),
-    vehicle_id: vehicles[0]?.id || '',
-    driver_id: drivers[0]?.id || '',
+    vehicle_id: '',
+    driver_id: '',
   });
 
-  // Automatically follow the default partner if the user hasn't made a manual choice
+  // Ensure default IDs are set once drivers/vehicles are loaded
+  useEffect(() => {
+    if (vehicles.length > 0 && !formData.vehicle_id) {
+      setFormData(prev => ({ ...prev, vehicle_id: vehicles[0].id }));
+    }
+    if (drivers.length > 0 && !formData.driver_id) {
+      setFormData(prev => ({ ...prev, driver_id: drivers[0].id }));
+    }
+  }, [vehicles, drivers]);
+
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      date: format(selectedDate, 'yyyy-MM-dd')
+    }));
+  }, [selectedDate]);
+
   useEffect(() => {
     if (!isManualSelection) {
       setSelectedCollabId(defaultCollaboratorId);
     }
   }, [defaultCollaboratorId, isManualSelection]);
 
-  // If the default partner is unset globally, clear any selection and reset manual flag
   useEffect(() => {
     if (!defaultCollaboratorId) {
       setSelectedCollabId(null);
@@ -164,6 +179,12 @@ const TripsView: React.FC<TripsViewProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.vehicle_id || !formData.driver_id) {
+      alert("Missing Required Data: Please ensure you have added at least one Truck and one Driver in the Admin Panel.");
+      return;
+    }
+
     const tripDate = parseISO(formData.date);
     const now = new Date();
     tripDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
@@ -348,7 +369,7 @@ const TripsView: React.FC<TripsViewProps> = ({
                       key={c.id} 
                       onClick={() => {
                         setSelectedCollabId(c.id);
-                        setIsManualSelection(true); // User made an explicit choice
+                        setIsManualSelection(true);
                       }} 
                       className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${isActive ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'} ${isDefault && !isActive ? 'ring-1 ring-safety-yellow/30' : ''}`}
                     >
@@ -413,145 +434,165 @@ const TripsView: React.FC<TripsViewProps> = ({
             <h2 className="text-2xl font-black italic uppercase tracking-tighter">New {subTab} Entry</h2>
             <button onClick={() => setShowAddForm(false)} className="text-zinc-500 font-bold uppercase text-xs tracking-widest">Cancel</button>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-6 pb-20">
-             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Vehicle</label>
-                <select value={formData.vehicle_id} onChange={(e)=>setFormData({...formData, vehicle_id: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow">
-                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.reg_number}</option>)}
-                </select>
+
+          {(vehicles.length === 0 || drivers.length === 0) ? (
+            <div className="bg-zinc-900/80 backdrop-blur-md p-10 rounded-[2rem] border-2 border-dashed border-zinc-800 text-center flex flex-col items-center gap-4">
+              <div className="p-4 bg-safety-yellow/10 rounded-full text-safety-yellow">
+                <AlertCircle size={48} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Driver</label>
-                <select value={formData.driver_id} onChange={(e)=>setFormData({...formData, driver_id: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow">
-                  {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
+              <div>
+                <h3 className="text-white font-black uppercase tracking-tighter text-xl italic">Setup Required</h3>
+                <p className="text-zinc-500 text-xs font-bold uppercase mt-2 leading-relaxed">
+                  You must add at least one truck and one driver in the Admin Panel before logging a trip.
+                </p>
               </div>
+              <button 
+                onClick={() => setShowAddForm(false)}
+                className="mt-4 px-8 py-4 bg-zinc-800 text-white rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all"
+              >
+                Back to View
+              </button>
             </div>
-            
-            {subTab === 'collaboration' && (
-              <div className="bg-zinc-900/50 p-4 rounded-2xl border-2 border-zinc-800/50 flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase text-zinc-500">Selected Partner</span>
-                  <span className="text-white font-black italic uppercase tracking-tight">
-                    {collaborators.find(c => c.id === selectedCollabId)?.name || 'None Selected'}
-                  </span>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6 pb-20">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500">Vehicle</label>
+                  <select value={formData.vehicle_id} onChange={(e)=>setFormData({...formData, vehicle_id: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow">
+                    {vehicles.map(v => <option key={v.id} value={v.id}>{v.reg_number}</option>)}
+                  </select>
                 </div>
-                {selectedCollabId === defaultCollaboratorId && (
-                  <div className="px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-lg flex items-center gap-1.5">
-                    <Star size={10} className="fill-safety-yellow text-safety-yellow" />
-                    <span className="text-[8px] font-black text-safety-yellow uppercase">Default</span>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500">Driver</label>
+                  <select value={formData.driver_id} onChange={(e)=>setFormData({...formData, driver_id: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow">
+                    {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              
+              {subTab === 'collaboration' && (
+                <div className="bg-zinc-900/50 p-4 rounded-2xl border-2 border-zinc-800/50 flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-zinc-500">Selected Partner</span>
+                    <span className="text-white font-black italic uppercase tracking-tight">
+                      {collaborators.find(c => c.id === selectedCollabId)?.name || 'None Selected'}
+                    </span>
                   </div>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-zinc-500">Site Name</label>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Enter Site Name" 
-                  value={formData.site_name} 
-                  onChange={(e)=>setFormData({...formData, site_name: e.target.value})} 
-                  className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 pr-14 font-bold text-white focus:border-safety-yellow outline-none transition-all" 
-                  required 
-                />
-                <button 
-                  type="button"
-                  onClick={handleGetLocation}
-                  disabled={isLocating}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-800 p-2.5 rounded-xl text-safety-yellow hover:bg-zinc-700 active:scale-90 transition-all border border-zinc-700"
-                  title="Tag Current Location"
-                >
-                  {isLocating ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1"><Layers size={10} /> Material</label>
-                <select 
-                  value={formData.material_type} 
-                  onChange={(e)=>setFormData({...formData, material_type: e.target.value})} 
-                  className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow appearance-none"
-                >
-                  {materials.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Units</label>
-                <div className="relative">
-                  {showAddUnitInput ? (
-                    <div className="flex gap-1 animate-in slide-in-from-right-2 duration-200">
-                      <input 
-                        type="text" 
-                        placeholder="New Unit"
-                        value={newUnitName}
-                        onChange={(e)=>setNewUnitName(e.target.value)}
-                        className="w-full bg-zinc-900 border-2 border-safety-yellow rounded-2xl p-4 text-sm font-bold text-white outline-none"
-                        autoFocus
-                      />
-                      <button 
-                        type="button"
-                        onClick={handleAddCustomUnit}
-                        className="bg-safety-yellow text-zinc-950 p-4 rounded-2xl shadow-lg"
-                      >
-                        <Check size={18} strokeWidth={3} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-1 items-center">
-                      <div className="relative flex-1">
-                        <select 
-                          value={formData.unit} 
-                          onChange={(e)=>setFormData({...formData, unit: e.target.value})} 
-                          className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow outline-none appearance-none"
-                        >
-                          {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-                        </select>
-                        <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 rotate-90 pointer-events-none" />
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => setShowAddUnitInput(true)}
-                        className="p-4 bg-zinc-800 border-2 border-zinc-800 rounded-2xl text-safety-yellow active:scale-90 transition-all shadow-md"
-                        title="Add Custom Unit"
-                      >
-                        <Plus size={18} strokeWidth={3} />
-                      </button>
+                  {selectedCollabId === defaultCollaboratorId && (
+                    <div className="px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-lg flex items-center gap-1.5">
+                      <Star size={10} className="fill-safety-yellow text-safety-yellow" />
+                      <span className="text-[8px] font-black text-safety-yellow uppercase">Default</span>
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
+              )}
 
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-zinc-500">Quantity</label>
-                <input type="number" step="0.1" value={formData.quantity} onChange={(e)=>setFormData({...formData, quantity: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white outline-none focus:border-safety-yellow" required />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black uppercase text-zinc-500">Rate (₹)</label>
-                  <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest italic">Optional</span>
+                <label className="text-[10px] font-black uppercase text-zinc-500">Site Name</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="Enter Site Name" 
+                    value={formData.site_name} 
+                    onChange={(e)=>setFormData({...formData, site_name: e.target.value})} 
+                    className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 pr-14 font-bold text-white focus:border-safety-yellow outline-none transition-all" 
+                    required 
+                  />
+                  <button 
+                    type="button"
+                    onClick={handleGetLocation}
+                    disabled={isLocating}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-800 p-2.5 rounded-xl text-safety-yellow hover:bg-zinc-700 active:scale-90 transition-all border border-zinc-700"
+                    title="Tag Current Location"
+                  >
+                    {isLocating ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
+                  </button>
                 </div>
-                <input 
-                  type="number" 
-                  value={formData.rate} 
-                  onChange={(e)=>setFormData({...formData, rate: e.target.value})} 
-                  placeholder="0.00"
-                  className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white outline-none focus:border-emerald-500/50" 
-                />
               </div>
-            </div>
-            <button type="submit" className="w-full bg-safety-yellow text-zinc-950 py-6 rounded-2xl font-black text-xl uppercase tracking-widest shadow-2xl active:scale-95 transition-transform">Confirm Entry</button>
-          </form>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1"><Layers size={10} /> Material</label>
+                  <select 
+                    value={formData.material_type} 
+                    onChange={(e)=>setFormData({...formData, material_type: e.target.value})} 
+                    className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow appearance-none"
+                  >
+                    {materials.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500">Units</label>
+                  <div className="relative">
+                    {showAddUnitInput ? (
+                      <div className="flex gap-1 animate-in slide-in-from-right-2 duration-200">
+                        <input 
+                          type="text" 
+                          placeholder="New Unit"
+                          value={newUnitName}
+                          onChange={(e)=>setNewUnitName(e.target.value)}
+                          className="w-full bg-zinc-900 border-2 border-safety-yellow rounded-2xl p-4 text-sm font-bold text-white outline-none"
+                          autoFocus
+                        />
+                        <button 
+                          type="button"
+                          onClick={handleAddCustomUnit}
+                          className="bg-safety-yellow text-zinc-950 p-4 rounded-2xl shadow-lg"
+                        >
+                          <Check size={18} strokeWidth={3} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1 items-center">
+                        <div className="relative flex-1">
+                          <select 
+                            value={formData.unit} 
+                            onChange={(e)=>setFormData({...formData, unit: e.target.value})} 
+                            className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-4 text-sm font-bold text-white focus:border-safety-yellow outline-none appearance-none"
+                          >
+                            {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                          </select>
+                          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 rotate-90 pointer-events-none" />
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setShowAddUnitInput(true)}
+                          className="p-4 bg-zinc-800 border-2 border-zinc-800 rounded-2xl text-safety-yellow active:scale-90 transition-all shadow-md"
+                          title="Add Custom Unit"
+                        >
+                          <Plus size={18} strokeWidth={3} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-zinc-500">Quantity</label>
+                  <input type="number" step="0.1" value={formData.quantity} onChange={(e)=>setFormData({...formData, quantity: e.target.value})} className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white outline-none focus:border-safety-yellow" required />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black uppercase text-zinc-500">Rate (₹)</label>
+                    <span className="text-[8px] font-black uppercase text-zinc-600 tracking-widest italic">Optional</span>
+                  </div>
+                  <input 
+                    type="number" 
+                    value={formData.rate} 
+                    onChange={(e)=>setFormData({...formData, rate: e.target.value})} 
+                    placeholder="0.00"
+                    className="w-full bg-zinc-900 border-2 border-zinc-800 rounded-2xl p-5 font-black text-2xl text-white outline-none focus:border-emerald-500/50" 
+                  />
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-safety-yellow text-zinc-950 py-6 rounded-2xl font-black text-xl uppercase tracking-widest shadow-2xl active:scale-95 transition-transform">Confirm Entry</button>
+            </form>
+          )}
         </div>
       )}
 
-      {/* MANAGE PARTNERS OVERLAY */}
       {showManageCollabs && (
         <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-10">
@@ -578,14 +619,12 @@ const TripsView: React.FC<TripsViewProps> = ({
                           onClick={() => {
                             const newDefaultId = isDefault ? null : c.id;
                             onSetDefaultCollaborator(newDefaultId);
-                            
-                            // Immediately sync selection with the default change
                             if (newDefaultId) {
                               setSelectedCollabId(newDefaultId);
-                              setIsManualSelection(false); // Follow the new default
+                              setIsManualSelection(false);
                             } else {
                               setSelectedCollabId(null);
-                              setIsManualSelection(false); // No default to follow
+                              setIsManualSelection(false);
                             }
                           }}
                           className={`p-1.5 rounded-lg transition-all ${isDefault ? 'bg-safety-yellow/20 text-safety-yellow' : 'bg-zinc-800 text-zinc-600 hover:text-safety-yellow'}`}
