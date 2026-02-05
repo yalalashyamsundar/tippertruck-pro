@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppState, Driver, Vehicle, Trip } from '../types';
-import { UserPlus, Truck, Trash2, Edit2, Check, X, Type, Database, RefreshCcw, AlertCircle, ChevronRight, Users, ClipboardList } from 'lucide-react';
+import { UserPlus, Truck, Trash2, Edit2, Check, X, Type, Database, RefreshCcw, AlertCircle, ChevronRight, Users, ClipboardList, Bell, BellOff, Send, Code, Copy } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { subscribeUser, triggerMockPush } from '../services/pushService';
 
 interface AdminViewProps {
   state: AppState;
@@ -40,6 +41,20 @@ const AdminView: React.FC<AdminViewProps> = ({
   const [diagResults, setDiagResults] = useState<{table: string, status: 'ok' | 'error' | 'pending', error?: string}[]>([]);
   const [isRunningDiag, setIsRunningDiag] = useState(false);
 
+  // Notifications State
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default');
+  const [pushSubscription, setPushSubscription] = useState<PushSubscription | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  useEffect(() => {
+    // Check for existing subscription on load
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => setPushSubscription(sub));
+      });
+    }
+  }, []);
+
   const runDiagnostics = async () => {
     setIsRunningDiag(true);
     const tables = ['trips', 'vehicles', 'drivers', 'materials', 'units', 'collaborators', 'fuel_logs', 'expenses', 'tyres', 'app_settings'];
@@ -59,6 +74,40 @@ const AdminView: React.FC<AdminViewProps> = ({
     }
     setDiagResults(results as any);
     setIsRunningDiag(false);
+  };
+
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    const sub = await subscribeUser();
+    setPushSubscription(sub);
+    setNotifPermission(Notification.permission);
+    setIsSubscribing(false);
+    
+    if (sub) {
+      alert("Successfully subscribed to Push! Your device ID is now registered.");
+    }
+  };
+
+  const simulateNotification = async () => {
+    if (!pushSubscription) {
+      alert("Please subscribe to Push first!");
+      return;
+    }
+    
+    alert("Triggering spontaneous alert... Close the app or lock your phone. Alert arrives in 5 seconds.");
+    
+    await triggerMockPush(
+      pushSubscription, 
+      '🚨 Breakdown Alert', 
+      'Truck MH04-4422 reported a hydraulic issue at Site Alpha.'
+    );
+  };
+
+  const copySubscription = () => {
+    if (pushSubscription) {
+      navigator.clipboard.writeText(JSON.stringify(pushSubscription));
+      alert("Subscription JSON copied! Send this to your backend to trigger notifications.");
+    }
   };
 
   return (
@@ -138,7 +187,62 @@ const AdminView: React.FC<AdminViewProps> = ({
       )}
 
       {activePanel === 'settings' && (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-20">
+          {/* Notifications Setting */}
+          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-6">
+            <div className="flex items-center gap-3">
+              <Bell size={20} className="text-safety-yellow" />
+              <h3 className="text-sm font-black uppercase text-zinc-400">Push Notifications</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                <div className="flex-1">
+                  <p className="text-xs font-black text-white uppercase italic">System Handshake</p>
+                  <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1 leading-relaxed">
+                    {pushSubscription 
+                      ? 'Registered for spontaneous alerts' 
+                      : 'Not connected to Push Service'}
+                  </p>
+                </div>
+                {!pushSubscription ? (
+                  <button 
+                    onClick={handleSubscribe}
+                    disabled={isSubscribing}
+                    className="bg-safety-yellow text-zinc-950 px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isSubscribing ? 'Syncing...' : 'Subscribe'}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                     <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Connected</span>
+                  </div>
+                )}
+              </div>
+              
+              {pushSubscription && (
+                <div className="space-y-3">
+                  <button 
+                    onClick={simulateNotification}
+                    className="w-full flex items-center justify-center gap-2 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl text-[10px] font-black uppercase text-safety-yellow active:bg-safety-yellow active:text-zinc-950 transition-all shadow-md"
+                  >
+                    <Send size={14} /> Test spontaneous push
+                  </button>
+                  
+                  <div className="bg-zinc-950 rounded-2xl p-4 border border-zinc-800 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[8px] font-black text-zinc-500 uppercase">Device Subscription Data</span>
+                      <button onClick={copySubscription} className="text-safety-yellow p-1 hover:bg-zinc-800 rounded-lg transition-colors"><Copy size={12}/></button>
+                    </div>
+                    <code className="block text-[7px] text-zinc-600 font-mono break-all leading-tight max-h-20 overflow-y-auto">
+                      {JSON.stringify(pushSubscription)}
+                    </code>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

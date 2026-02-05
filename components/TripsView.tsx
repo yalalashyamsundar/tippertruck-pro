@@ -20,7 +20,9 @@ import {
   Star,
   Loader2,
   Layers,
-  AlertCircle
+  AlertCircle,
+  BarChart2,
+  History
 } from 'lucide-react';
 import { 
   format, 
@@ -238,11 +240,36 @@ const TripsView: React.FC<TripsViewProps> = ({
     return result;
   }, [trips, selectedDate, subTab, selectedCollabId, searchQuery, sortKey, sortDirection]);
 
-  const getCollabSummary = (collabId: string) => {
-    const collabTrips = trips.filter(t => t.collaborator_id === collabId);
-    const totalAmount = collabTrips.reduce((sum, t) => sum + (t.quantity * t.rate), 0);
-    return { count: collabTrips.length, amount: totalAmount };
-  };
+  // Enhanced Collaborator Statistics Logic
+  const collaboratorStats = useMemo(() => {
+    return collaborators.map(c => {
+      const collabTrips = trips.filter(t => t.collaborator_id === c.id);
+      const totalAmount = collabTrips.reduce((sum, t) => sum + (Number(t.quantity || 0) * Number(t.rate || 0)), 0);
+      
+      // Find most frequent material
+      const materialCounts: Record<string, number> = {};
+      collabTrips.forEach(t => {
+        materialCounts[t.material_type] = (materialCounts[t.material_type] || 0) + 1;
+      });
+      const topMaterial = Object.entries(materialCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+      return {
+        ...c,
+        tripCount: collabTrips.length,
+        totalRevenue: totalAmount,
+        topMaterial
+      };
+    });
+  }, [collaborators, trips]);
+
+  const overallPartnerStats = useMemo(() => {
+    const partnerTrips = trips.filter(t => t.contract_type === 'collaboration');
+    const totalRev = partnerTrips.reduce((sum, t) => sum + (Number(t.quantity || 0) * Number(t.rate || 0)), 0);
+    return {
+      count: partnerTrips.length,
+      revenue: totalRev
+    };
+  }, [trips]);
 
   const startEditCollab = (collab: Collaborator) => {
     setEditingCollabId(collab.id);
@@ -342,7 +369,7 @@ const TripsView: React.FC<TripsViewProps> = ({
                 } 
                 setShowAddForm(true); 
               }} 
-              className="bg-safety-yellow text-zinc-950 p-3 rounded-xl shadow-xl active:scale-90"
+              className="bg-safety-yellow text-zinc-950 p-3 rounded-xl shadow-xl active:scale-90 transition-transform"
             >
               <Plus size={20} strokeWidth={4} />
             </button>
@@ -371,12 +398,15 @@ const TripsView: React.FC<TripsViewProps> = ({
                         setSelectedCollabId(c.id);
                         setIsManualSelection(true);
                       }} 
-                      className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${isActive ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'} ${isDefault && !isActive ? 'ring-1 ring-safety-yellow/30' : ''}`}
+                      className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 font-black uppercase text-[10px] transition-all relative ${isActive ? 'bg-safety-yellow border-safety-yellow text-zinc-950 shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500'} ${isDefault && !isActive ? 'ring-2 ring-safety-yellow/40 ring-offset-2 ring-offset-zinc-950' : ''}`}
                     >
                       <span className="flex items-center gap-1.5">
                         {c.name}
                         {isDefault && <Star size={10} className={`${isActive ? 'fill-zinc-950 text-zinc-950' : 'fill-safety-yellow text-safety-yellow'}`} />}
                       </span>
+                      {isDefault && !isActive && (
+                         <div className="absolute -top-1.5 -right-1.5 bg-safety-yellow text-zinc-950 text-[6px] font-black px-1 rounded-full shadow-sm">DEF</div>
+                      )}
                     </button>
                   );
                 })}
@@ -471,7 +501,7 @@ const TripsView: React.FC<TripsViewProps> = ({
               </div>
               
               {subTab === 'collaboration' && (
-                <div className="bg-zinc-900/50 p-4 rounded-2xl border-2 border-zinc-800/50 flex justify-between items-center">
+                <div className={`bg-zinc-900/50 p-4 rounded-2xl border-2 flex justify-between items-center transition-all ${selectedCollabId === defaultCollaboratorId ? 'border-safety-yellow/30 bg-safety-yellow/5' : 'border-zinc-800/50'}`}>
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase text-zinc-500">Selected Partner</span>
                     <span className="text-white font-black italic uppercase tracking-tight">
@@ -479,9 +509,9 @@ const TripsView: React.FC<TripsViewProps> = ({
                     </span>
                   </div>
                   {selectedCollabId === defaultCollaboratorId && (
-                    <div className="px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-lg flex items-center gap-1.5">
-                      <Star size={10} className="fill-safety-yellow text-safety-yellow" />
-                      <span className="text-[8px] font-black text-safety-yellow uppercase">Default</span>
+                    <div className="px-2 py-1 bg-safety-yellow text-zinc-950 rounded-lg flex items-center gap-1.5 shadow-lg animate-pulse">
+                      <Star size={10} className="fill-zinc-950" />
+                      <span className="text-[8px] font-black uppercase">Pre-selected</span>
                     </div>
                   )}
                 </div>
@@ -595,26 +625,46 @@ const TripsView: React.FC<TripsViewProps> = ({
 
       {showManageCollabs && (
         <div className="fixed inset-0 z-[100] bg-zinc-950/80 backdrop-blur-md p-6 overflow-y-auto animate-in fade-in duration-300">
-          <div className="flex justify-between items-center mb-10">
+          <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-black text-safety-yellow uppercase italic tracking-tighter">Partner Settings</h2>
-            <button onClick={() => setShowManageCollabs(false)} className="bg-zinc-800 p-2 rounded-xl"><X size={24}/></button>
+            <button onClick={() => setShowManageCollabs(false)} className="bg-zinc-800 p-2 rounded-xl text-zinc-400"><X size={24}/></button>
           </div>
+
           <div className="space-y-6">
+            {/* Overall Collaboration Performance */}
+            <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-5">
+                  <BarChart2 size={80} className="text-white" />
+               </div>
+               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-4">Collaboration Overview</p>
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                     <p className="text-2xl font-black text-white italic">{overallPartnerStats.count}</p>
+                     <p className="text-[8px] font-black text-zinc-600 uppercase">Total Logged Trips</p>
+                  </div>
+                  <div className="space-y-1">
+                     <p className="text-2xl font-black text-emerald-500 italic">₹{overallPartnerStats.revenue.toLocaleString()}</p>
+                     <p className="text-[8px] font-black text-zinc-600 uppercase">Settled Business Value</p>
+                  </div>
+               </div>
+            </div>
+
             <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 shadow-xl space-y-4">
               <p className="text-[10px] font-black uppercase text-zinc-500">Add New Partner</p>
               <div className="flex gap-2">
-                <input type="text" placeholder="Partner Name" value={newCollabName} onChange={e=>setNewCollabName(e.target.value)} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold outline-none focus:border-safety-yellow" />
-                <button onClick={()=>{ if(newCollabName.trim()){ onAddCollaborator(newCollabName); setNewCollabName(''); } }} className="bg-safety-yellow text-zinc-950 px-6 rounded-xl font-black text-[10px] uppercase shadow-lg">Add</button>
+                <input type="text" placeholder="Partner Name" value={newCollabName} onChange={e=>setNewCollabName(e.target.value)} className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold outline-none focus:border-safety-yellow transition-all" />
+                <button onClick={()=>{ if(newCollabName.trim()){ onAddCollaborator(newCollabName); setNewCollabName(''); } }} className="bg-safety-yellow text-zinc-950 px-6 rounded-xl font-black text-[10px] uppercase shadow-lg active:scale-95 transition-transform">Add</button>
               </div>
             </div>
-            <div className="space-y-3 pb-20">
-              {collaborators.map(c => {
-                const summary = getCollabSummary(c.id);
+
+            <div className="space-y-4 pb-20">
+              <p className="text-[10px] font-black uppercase text-zinc-600 tracking-[0.2em] px-1">Registered Partners</p>
+              {collaboratorStats.map(c => {
                 const isDefault = defaultCollaboratorId === c.id;
                 return (
-                  <div key={c.id} className={`bg-zinc-900 p-5 rounded-2xl border flex flex-col gap-3 transition-colors ${isDefault ? 'border-safety-yellow/40 bg-zinc-900/80' : 'border-zinc-800'}`}>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2 flex-1">
+                  <div key={c.id} className={`bg-zinc-900 p-5 rounded-3xl border flex flex-col gap-4 transition-all duration-300 ${isDefault ? 'border-safety-yellow/40 bg-safety-yellow/5' : 'border-zinc-800'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3 flex-1">
                         <button 
                           onClick={() => {
                             const newDefaultId = isDefault ? null : c.id;
@@ -627,39 +677,52 @@ const TripsView: React.FC<TripsViewProps> = ({
                               setIsManualSelection(false);
                             }
                           }}
-                          className={`p-1.5 rounded-lg transition-all ${isDefault ? 'bg-safety-yellow/20 text-safety-yellow' : 'bg-zinc-800 text-zinc-600 hover:text-safety-yellow'}`}
+                          className={`p-2 rounded-xl transition-all border ${isDefault ? 'bg-safety-yellow text-zinc-950 border-safety-yellow' : 'bg-zinc-800 text-zinc-600 border-zinc-700 hover:text-safety-yellow'}`}
                           title={isDefault ? "Unset default" : "Set as default"}
                         >
-                          <Star size={16} className={isDefault ? 'fill-safety-yellow' : ''} />
+                          <Star size={18} className={isDefault ? 'fill-zinc-950' : ''} />
                         </button>
+                        
                         {editingCollabId === c.id ? (
                           <div className="flex-1 flex gap-2">
-                            <input autoFocus value={editingCollabName} onChange={e=>setEditingCollabName(e.target.value)} className="flex-1 bg-zinc-800 rounded px-3 py-2 text-white font-bold border border-safety-yellow outline-none" />
-                            <button onClick={() => saveEditCollab(c.id)} className="p-2 bg-emerald-500 text-zinc-950 rounded-lg"><Check size={16}/></button>
+                            <input autoFocus value={editingCollabName} onChange={e=>setEditingCollabName(e.target.value)} className="flex-1 bg-zinc-800 rounded-xl px-4 py-2 text-white font-bold border border-safety-yellow outline-none" />
+                            <button onClick={() => saveEditCollab(c.id)} className="p-2 bg-emerald-500 text-zinc-950 rounded-xl"><Check size={20}/></button>
                           </div>
                         ) : (
-                          <p className={`font-black text-lg italic tracking-tight uppercase ${isDefault ? 'text-safety-yellow' : 'text-white'}`}>{c.name}</p>
+                          <div className="flex flex-col">
+                            <p className={`font-black text-xl italic tracking-tight uppercase ${isDefault ? 'text-safety-yellow' : 'text-white'}`}>{c.name}</p>
+                            {isDefault && <p className="text-[8px] font-black text-safety-yellow/60 uppercase tracking-widest mt-0.5">Primary Business Partner</p>}
+                          </div>
                         )}
                       </div>
                       <div className="flex gap-1 ml-2">
-                        {!editingCollabId && <button onClick={()=>startEditCollab(c)} className="p-2 text-zinc-500 hover:text-safety-yellow"><Edit2 size={16}/></button>}
-                        <button onClick={()=>onDeleteCollaborator(c.id)} className="p-2 text-red-500/60 hover:text-red-500"><Trash2 size={16}/></button>
+                        {!editingCollabId && <button onClick={()=>startEditCollab(c)} className="p-2 text-zinc-500 hover:text-safety-yellow transition-colors"><Edit2 size={16}/></button>}
+                        <button onClick={()=>onDeleteCollaborator(c.id)} className="p-2 text-red-500/40 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 border-t border-zinc-800/50 pt-3">
-                      <div className="flex items-center gap-1.5 bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-800">
-                        <TrendingUp size={10} className="text-safety-yellow"/>
-                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{summary.count} Trips</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-800">
-                        <IndianRupee size={10} className="text-emerald-500"/>
-                        <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">₹{summary.amount.toLocaleString()}</span>
-                      </div>
-                      {isDefault && (
-                        <div className="ml-auto px-2 py-1 bg-safety-yellow/10 border border-safety-yellow/20 rounded-md">
-                          <span className="text-[8px] font-black text-safety-yellow uppercase tracking-widest">Default Partner</span>
+
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      <div className="bg-zinc-950/50 p-3 rounded-2xl border border-zinc-800/50">
+                        <p className="text-[7px] font-black text-zinc-600 uppercase mb-1">Trips</p>
+                        <div className="flex items-center gap-1.5">
+                           <TrendingUp size={10} className="text-safety-yellow"/>
+                           <span className="text-[10px] font-black text-zinc-300 uppercase">{c.tripCount}</span>
                         </div>
-                      )}
+                      </div>
+                      <div className="bg-zinc-950/50 p-3 rounded-2xl border border-zinc-800/50">
+                        <p className="text-[7px] font-black text-zinc-600 uppercase mb-1">Earnings</p>
+                        <div className="flex items-center gap-1.5">
+                           <IndianRupee size={10} className="text-emerald-500"/>
+                           <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">₹{c.totalRevenue.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="bg-zinc-950/50 p-3 rounded-2xl border border-zinc-800/50">
+                        <p className="text-[7px] font-black text-zinc-600 uppercase mb-1">Top Material</p>
+                        <div className="flex items-center gap-1.5">
+                           <Layers size={10} className="text-blue-500"/>
+                           <span className="text-[10px] font-black text-zinc-400 uppercase truncate max-w-full">{c.topMaterial}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );

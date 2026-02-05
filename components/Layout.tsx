@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Home, ClipboardList, Fuel, Settings, User } from 'lucide-react';
-import { supabase } from '../services/supabaseClient';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,8 +37,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100 pb-24">
-      <header className="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 p-4 shadow-lg flex justify-between items-center">
+    <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
+      <header className="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 px-4 pb-4 shadow-lg flex justify-between items-center" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-3">
           <AppLogo />
           <div className="flex flex-col items-end">
@@ -67,7 +66,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         {children}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 flex justify-around items-center h-20 px-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 flex justify-around items-center px-2 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-50" style={{ height: 'calc(5rem + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -84,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute bottom-0 w-8 h-1 bg-safety-yellow rounded-t-full"></div>
+                <div className="absolute bottom-0 w-8 h-1 bg-safety-yellow rounded-t-full" style={{ bottom: 'env(safe-area-inset-bottom)' }}></div>
               )}
             </button>
           );
